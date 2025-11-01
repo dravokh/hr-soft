@@ -1,21 +1,24 @@
-import React, { FormEvent, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
-  PlusCircle,
+  AlertCircle,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardList,
+  Clock3,
   Layers3,
   PencilLine,
-  Trash2,
+  PlusCircle,
+  Save,
   Settings2,
-  Clock3,
-  CheckCircle2
+  ShieldCheck,
+  Trash2
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import {
-  ApplicationBundle,
   ApplicationFieldDefinition,
-  ApplicationFieldType,
   ApplicationStepSLA,
   ApplicationType,
-  Role
+  ApplicationTypeCapabilities
 } from '../types';
 
 interface ApplicationTypesPageProps {
@@ -24,373 +27,419 @@ interface ApplicationTypesPageProps {
 
 type Mode = 'view' | 'edit' | 'create';
 
-interface FieldForm {
+type CustomFieldType = 'text' | 'number' | 'textarea';
+
+interface CustomFieldForm {
   key: string;
-  label: { ka: string; en: string };
-  type: ApplicationFieldType;
+  labelKa: string;
+  labelEn: string;
+  type: CustomFieldType;
   required: boolean;
-  placeholder: { ka: string; en: string };
-  helper: { ka: string; en: string };
-  optionsText: string;
-  editableStepsText: string;
 }
 
-interface SlaForm {
+interface SlaFormEntry {
   stepIndex: number;
   hours: number;
   onExpire: ApplicationStepSLA['onExpire'];
 }
 
-interface ApplicationTypeForm {
-  id?: number;
-  name: { ka: string; en: string };
-  description: { ka: string; en: string };
+interface FormState {
+  nameKa: string;
+  nameEn: string;
+  descriptionKa: string;
+  descriptionEn: string;
   icon: string;
   color: string;
-  fields: FieldForm[];
+  capabilities: ApplicationTypeCapabilities;
   flow: number[];
-  sla: SlaForm[];
+  sla: SlaFormEntry[];
+  allowedRoleIds: number[];
+  reasonLabelKa: string;
+  reasonLabelEn: string;
+  commentLabelKa: string;
+  commentLabelEn: string;
+  customFields: CustomFieldForm[];
 }
 
-const FIELD_TYPES: { value: ApplicationFieldType; label: { ka: string; en: string } }[] = [
-  { value: 'text', label: { ka: 'ტექსტი', en: 'Text' } },
-  { value: 'textarea', label: { ka: 'ტექსტური ბლოკი', en: 'Textarea' } },
-  { value: 'date', label: { ka: 'თარიღი', en: 'Date' } },
-  { value: 'date_range', label: { ka: 'თარიღების დიაპაზონი', en: 'Date range' } },
-  { value: 'number', label: { ka: 'რიცხვი', en: 'Number' } },
-  { value: 'select', label: { ka: 'არჩევანი', en: 'Select' } }
-];
-
-const SLA_ACTION_LABELS: Record<ApplicationStepSLA['onExpire'], { ka: string; en: string }> = {
-  AUTO_APPROVE: { ka: 'ავტომატური დამტკიცება', en: 'Auto approve' },
-  BOUNCE_BACK: { ka: 'დაბრუნება ავტორზე', en: 'Return to requester' }
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  CalendarDays,
+  Clock3,
+  ClipboardList,
+  Layers3,
+  CheckCircle2
 };
 
-const INPUT_CLASS =
-  'w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 disabled:bg-slate-100 disabled:text-slate-500';
+const KNOWN_FIELD_KEYS = new Set([
+  'reason',
+  'start_date',
+  'end_date',
+  'start_time',
+  'end_time',
+  'additional_comment'
+]);
+
+const DEFAULT_REASON_PLACEHOLDER = {
+  ka: 'მოკლედ აღწერეთ განაცხადის მიზეზი…',
+  en: 'Describe why you are submitting this request…'
+};
+
+const DEFAULT_COMMENT_PLACEHOLDER = {
+  ka: 'შეიტანეთ დამატებითი ინფორმაცია საჭიროების შემთხვევაში…',
+  en: 'Add context for reviewers if needed…'
+};
 
 const COPY: Record<
   ApplicationTypesPageProps['language'],
   {
     title: string;
     subtitle: string;
-    newType: string;
-    viewTitle: string;
-    editTitle: string;
-    createTitle: string;
-    nameLabel: string;
-    descriptionLabel: string;
+    create: string;
+    edit: string;
+    view: string;
+    empty: string;
+    basicInformation: string;
+    nameKa: string;
+    nameEn: string;
+    descriptionKa: string;
+    descriptionEn: string;
     iconLabel: string;
     colorLabel: string;
-    colorHelp: string;
-    fieldSection: string;
-    addField: string;
-    removeField: string;
+    colorHint: string;
+    fieldSettings: string;
+    reasonLabel: string;
+    commentLabel: string;
+    toggles: {
+      requiresDateRange: string;
+      requiresTimeRange: string;
+      hasCommentField: string;
+      allowsAttachments: string;
+    };
+    allowedRoles: string;
+    customFieldTitle: string;
+    addCustomField: string;
     fieldKey: string;
     fieldLabelKa: string;
     fieldLabelEn: string;
     fieldType: string;
     fieldRequired: string;
-    fieldPlaceholderKa: string;
-    fieldPlaceholderEn: string;
-    fieldHelperKa: string;
-    fieldHelperEn: string;
-    fieldOptions: string;
-    fieldOptionsHelp: string;
-    fieldEditableSteps: string;
-    flowSection: string;
+    flowTitle: string;
     addStep: string;
-    removeStep: string;
-    stepLabel: (index: number) => string;
-    slaSection: string;
-    addSla: string;
-    removeSla: string;
-    slaStep: string;
-    slaHours: string;
-    slaAction: string;
-    save: string;
-    saving: string;
-    cancel: string;
-    delete: string;
-    confirmCreate: string;
-    confirmUpdate: string;
-    confirmDelete: string;
-    validation: string;
-    fieldValidation: string;
-    emptyList: string;
+    slaTitle: string;
+    hours: string;
+    expiryAction: string;
+    actions: { save: string; saving: string; cancel: string; delete: string };
+    successCreated: string;
+    successUpdated: string;
+    successDeleted: string;
     noPermission: string;
-    created: string;
-    updated: string;
-    deleted: string;
+    validationError: string;
+    selectRole: string;
+    customFieldTypes: Record<CustomFieldType, string>;
+    expireActions: Record<ApplicationStepSLA['onExpire'], string>;
   }
 > = {
   ka: {
     title: 'განაცხადების ტიპები',
-    subtitle: 'დააკონფიგურირეთ სამუშაო ნაკადები, ველები და SLA წესები თითოეული განაცხადისთვის.',
-    newType: 'ახალი ტიპი',
-    viewTitle: 'ტიპის დეტალები',
-    editTitle: 'ტიპის რედაქტირება',
-    createTitle: 'ახალი განაცხადის ტიპი',
-    nameLabel: 'დასახელება',
-    descriptionLabel: 'აღწერა',
+    subtitle: 'მართეთ დამტკიცების ნაკადები, სტანდარტული ველები და SLA წესები თითოეული განაცხადისთვის.',
+    create: 'ახალი ტიპის შექმნა',
+    edit: 'ტიპის რედაქტირება',
+    view: 'ტიპის დეტალები',
+    empty: 'ჯერ არცერთი განაცხადის ტიპი არ არის შექმნილი.',
+    basicInformation: 'ძირითადი ინფორმაცია',
+    nameKa: 'დასახელება (ქართ.)',
+    nameEn: 'დასახელება (ინგლ.)',
+    descriptionKa: 'აღწერა (ქართ.)',
+    descriptionEn: 'აღწერა (ინგლ.)',
     iconLabel: 'Icon (Lucide)',
-    colorLabel: 'ფერი (Tailwind class)',
-    colorHelp: 'მაგალითად: bg-sky-500, bg-emerald-500',
-    fieldSection: 'ველები',
-    addField: 'ველის დამატება',
-    removeField: 'ველის წაშლა',
+    colorLabel: 'ფერი (Tailwind კლასი)',
+    colorHint: 'მაგ: bg-sky-500, bg-emerald-500',
+    fieldSettings: 'ველების კონფიგურაცია',
+    reasonLabel: 'მიზნის ველის სათაური',
+    commentLabel: 'კომენტარის ველის სათაური',
+    toggles: {
+      requiresDateRange: 'საჭიროა კალენდრის დიაპაზონი',
+      requiresTimeRange: 'საჭიროა დროის დიაპაზონი',
+      hasCommentField: 'დამატებითი კომენტარი',
+      allowsAttachments: 'ფაილების ატვირთვა დაშვებულია'
+    },
+    allowedRoles: 'ვინ შეუძლია განაცხადის შექმნა',
+    customFieldTitle: 'დამატებითი ველები',
+    addCustomField: 'ველი',
     fieldKey: 'Key',
     fieldLabelKa: 'სათაური (ქართ.)',
     fieldLabelEn: 'სათაური (ინგლ.)',
     fieldType: 'ტიპი',
     fieldRequired: 'სავალდებულო',
-    fieldPlaceholderKa: 'Placeholder (ქართ.)',
-    fieldPlaceholderEn: 'Placeholder (ინგლ.)',
-    fieldHelperKa: 'დამხმარე ტექსტი (ქართ.)',
-    fieldHelperEn: 'დამხმარე ტექსტი (ინგლ.)',
-    fieldOptions: 'არჩევანის ვარიანტები',
-    fieldOptionsHelp: 'თითო ხაზზე: value|ქართული ეტიკეტი|English label',
-    fieldEditableSteps: 'რედაქტირებადი ნაბიჯები (მაგ. 0,2)',
-    flowSection: 'დამტკიცების მიმდევრობა',
+    flowTitle: 'დამტკიცების მიმდევრობა',
     addStep: 'ნაბიჯის დამატება',
-    removeStep: 'ამოღება',
-    stepLabel: (index: number) => `${index + 1}-ე`,
-    slaSection: 'SLA პარამეტრები',
-    addSla: 'SLA ჩანაწერის დამატება',
-    removeSla: 'წაშლა',
-    slaStep: 'ნაბიჯი',
-    slaHours: 'ვადა (საათი)',
-    slaAction: 'ქმედება ვადის ამოწურვისას',
-    save: 'შენახვა',
-    saving: 'ინახება…',
-    cancel: 'გაუქმება',
-    delete: 'წაშლა',
-    confirmCreate: 'ტიპის შექმნა',
-    confirmUpdate: 'ტიპის განახლება',
-    confirmDelete: 'ტიპის წაშლა',
-    validation: 'გთხოვთ შეავსოთ სავალდებულო ველები და დაამატოთ მინიმუმ ერთი ნაბიჯი.',
-    fieldValidation: 'ყველა ველს ესაჭიროება key და სათაურები.',
-    emptyList: 'ჯერ არცერთი განაცხადის ტიპი არ არის შექმნილი.',
+    slaTitle: 'SLA თითო ნაბიჯზე',
+    hours: 'საათი',
+    expiryAction: 'ვადის ამოწურვისას',
+    actions: {
+      save: 'შენახვა',
+      saving: 'ინახება…',
+      cancel: 'გაუქმება',
+      delete: 'ტიპის წაშლა'
+    },
+    successCreated: 'ტიპი წარმატებით შეიქმნა.',
+    successUpdated: 'ცვლილებები შენახულია.',
+    successDeleted: 'ტიპი წაიშალა.',
     noPermission: 'თქვენ არ გაქვთ განაცხადების ტიპების მართვის უფლება.',
-    created: 'ტიპი წარმატებით შეიქმნა.',
-    updated: 'ტიპი წარმატებით განახლდა.',
-    deleted: 'ტიპი წაიშალა.'
+    validationError: 'გთხოვთ შეავსოთ სავალდებულო ველები და მიუთითოთ მინიმუმ ერთი ნაბიჯი.',
+    selectRole: 'აირჩიეთ როლი…',
+    customFieldTypes: {
+      text: 'ტექსტი',
+      number: 'რიცხვი',
+      textarea: 'ტექსტური ბლოკი'
+    },
+    expireActions: {
+      AUTO_APPROVE: 'ავტომატური დამტკიცება',
+      BOUNCE_BACK: 'დაბრუნება ავტორზე'
+    }
   },
   en: {
     title: 'Application types',
-    subtitle: 'Configure workflows, fields, and SLA rules for each request.',
-    newType: 'New type',
-    viewTitle: 'Type overview',
-    editTitle: 'Edit type',
-    createTitle: 'Create application type',
-    nameLabel: 'Name',
-    descriptionLabel: 'Description',
+    subtitle: 'Configure approval flows, standard fields, and SLA rules for each request.',
+    create: 'Create type',
+    edit: 'Edit type',
+    view: 'Type overview',
+    empty: 'No application types have been created yet.',
+    basicInformation: 'Basic information',
+    nameKa: 'Name (Georgian)',
+    nameEn: 'Name (English)',
+    descriptionKa: 'Description (Georgian)',
+    descriptionEn: 'Description (English)',
     iconLabel: 'Icon (Lucide)',
     colorLabel: 'Color (Tailwind class)',
-    colorHelp: 'For example: bg-sky-500, bg-emerald-500',
-    fieldSection: 'Fields',
-    addField: 'Add field',
-    removeField: 'Remove field',
+    colorHint: 'e.g. bg-sky-500, bg-emerald-500',
+    fieldSettings: 'Field configuration',
+    reasonLabel: 'Purpose field label',
+    commentLabel: 'Comment field label',
+    toggles: {
+      requiresDateRange: 'Require calendar range',
+      requiresTimeRange: 'Require time range',
+      hasCommentField: 'Include comment box',
+      allowsAttachments: 'Allow attachments'
+    },
+    allowedRoles: 'Who can submit this request',
+    customFieldTitle: 'Additional fields',
+    addCustomField: 'Add field',
     fieldKey: 'Field key',
     fieldLabelKa: 'Label (Georgian)',
     fieldLabelEn: 'Label (English)',
     fieldType: 'Type',
     fieldRequired: 'Required',
-    fieldPlaceholderKa: 'Placeholder (Georgian)',
-    fieldPlaceholderEn: 'Placeholder (English)',
-    fieldHelperKa: 'Helper (Georgian)',
-    fieldHelperEn: 'Helper (English)',
-    fieldOptions: 'Select options',
-    fieldOptionsHelp: 'One per line: value|Georgian label|English label',
-    fieldEditableSteps: 'Editable steps (e.g. 0,2)',
-    flowSection: 'Approval flow',
+    flowTitle: 'Approval flow',
     addStep: 'Add step',
-    removeStep: 'Remove',
-    stepLabel: (index: number) => `Step ${index + 1}`,
-    slaSection: 'SLA settings',
-    addSla: 'Add SLA',
-    removeSla: 'Remove',
-    slaStep: 'Step',
-    slaHours: 'Deadline (hours)',
-    slaAction: 'Action on expire',
-    save: 'Save',
-    saving: 'Saving…',
-    cancel: 'Cancel',
-    delete: 'Delete',
-    confirmCreate: 'Create type',
-    confirmUpdate: 'Update type',
-    confirmDelete: 'Delete type',
-    validation: 'Please complete the required fields and add at least one step.',
-    fieldValidation: 'Every field needs a key and both labels.',
-    emptyList: 'No application types available yet.',
-    noPermission: 'You do not have permission to manage application types.',
-    created: 'Type created successfully.',
-    updated: 'Type updated successfully.',
-    deleted: 'Type deleted.'
+    slaTitle: 'SLA per step',
+    hours: 'Hours',
+    expiryAction: 'When overdue',
+    actions: {
+      save: 'Save changes',
+      saving: 'Saving…',
+      cancel: 'Cancel',
+      delete: 'Delete type'
+    },
+    successCreated: 'Type created successfully.',
+    successUpdated: 'Changes saved successfully.',
+    successDeleted: 'Type removed successfully.',
+    noPermission: 'You do not have permission to manage request types.',
+    validationError: 'Please fill in required fields and configure at least one approval step.',
+    selectRole: 'Select role…',
+    customFieldTypes: {
+      text: 'Text',
+      number: 'Number',
+      textarea: 'Textarea'
+    },
+    expireActions: {
+      AUTO_APPROVE: 'Auto approve',
+      BOUNCE_BACK: 'Return to requester'
+    }
   }
 };
 
-const createEmptyField = (): FieldForm => ({
-  key: '',
-  label: { ka: '', en: '' },
-  type: 'text',
-  required: true,
-  placeholder: { ka: '', en: '' },
-  helper: { ka: '', en: '' },
-  optionsText: '',
-  editableStepsText: ''
-});
-
-const flowToBadge = (flow: number[], roles: Role[], language: 'ka' | 'en') => {
-  if (!flow.length) {
-    return language === 'ka' ? 'ნაბიჯები არ არის' : 'No steps';
-  }
-  return flow
-    .map((roleId, index) => {
-      const role = roles.find((candidate) => candidate.id === roleId);
-      return role ? `${index + 1}. ${role.name}` : `${index + 1}. #${roleId}`;
-    })
-    .join(' → ');
-};
-
-const mapFieldToForm = (field: ApplicationFieldDefinition): FieldForm => ({
-  key: field.key,
-  label: { ...field.label },
-  type: field.type,
-  required: field.required,
-  placeholder: {
-    ka: field.placeholder?.ka ?? '',
-    en: field.placeholder?.en ?? ''
-  },
-  helper: {
-    ka: field.helper?.ka ?? '',
-    en: field.helper?.en ?? ''
-  },
-  optionsText:
-    field.options?.map((option) => `${option.value}|${option.label.ka}|${option.label.en}`).join('\n') ?? '',
-  editableStepsText: field.editableSteps?.join(',') ?? ''
-});
-
-const mapTypeToForm = (type: ApplicationType): ApplicationTypeForm => ({
-  id: type.id,
-  name: { ...type.name },
-  description: { ...type.description },
-  icon: type.icon,
-  color: type.color,
-  fields: type.fields.map(mapFieldToForm),
-  flow: [...type.flow],
-  sla: type.slaPerStep.map((entry) => ({
-    stepIndex: entry.stepIndex,
-    hours: Math.round(entry.seconds / 3600),
-    onExpire: entry.onExpire
-  }))
-});
-
-const parseFieldForm = (field: FieldForm): ApplicationFieldDefinition => {
-  const options = field.optionsText
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [value, ka, en] = line.split('|').map((part) => part.trim());
-      if (!value || !ka || !en) {
-        return null;
+const syncSlaWithFlow = (flow: number[], current: SlaFormEntry[]): SlaFormEntry[] => {
+  const existing = new Map(current.map((entry) => [entry.stepIndex, entry] as const));
+  return flow.map((_, index) => {
+    const match = existing.get(index);
+    return (
+      match ?? {
+        stepIndex: index,
+        hours: 24,
+        onExpire: 'AUTO_APPROVE'
       }
-      return {
-        value,
-        label: { ka, en }
-      };
-    })
-    .filter((option): option is NonNullable<typeof option> => Boolean(option));
-
-  const editableSteps = field.editableStepsText
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-    .map((entry) => Number.parseInt(entry, 10))
-    .filter((value) => Number.isFinite(value));
-
-  const placeholderExists = field.placeholder.ka.trim() || field.placeholder.en.trim();
-  const helperExists = field.helper.ka.trim() || field.helper.en.trim();
-
-  return {
-    key: field.key.trim(),
-    label: {
-      ka: field.label.ka.trim(),
-      en: field.label.en.trim()
-    },
-    type: field.type,
-    required: field.required,
-    ...(placeholderExists
-      ? {
-          placeholder: {
-            ka: field.placeholder.ka.trim(),
-            en: field.placeholder.en.trim()
-          }
-        }
-      : {}),
-    ...(options.length ? { options } : {}),
-    ...(helperExists
-      ? {
-          helper: {
-            ka: field.helper.ka.trim(),
-            en: field.helper.en.trim()
-          }
-        }
-      : {}),
-    ...(editableSteps.length ? { editableSteps } : {})
-  };
+    );
+  });
 };
 
-const parseFormToType = (form: ApplicationTypeForm): Omit<ApplicationType, 'id'> | ApplicationType => {
-  const fields = form.fields.map(parseFieldForm);
-  const slaPerStep: ApplicationStepSLA[] = form.sla.map((entry) => ({
-    stepIndex: entry.stepIndex,
-    seconds: Math.max(1, entry.hours) * 3600,
-    onExpire: entry.onExpire
-  }));
-
-  const base = {
-    name: {
-      ka: form.name.ka.trim(),
-      en: form.name.en.trim()
-    },
-    description: {
-      ka: form.description.ka.trim(),
-      en: form.description.en.trim()
-    },
-    icon: form.icon.trim() || 'FileText',
-    color: form.color.trim() || 'bg-slate-500',
-    fields,
-    flow: form.flow.filter((id) => Number.isFinite(id)),
-    slaPerStep
-  };
-
-  if (typeof form.id === 'number') {
-    return { id: form.id, ...base };
-  }
-
-  return base;
+const getIconComponent = (iconName: string) => {
+  const Component = ICON_MAP[iconName];
+  return Component ?? Layers3;
 };
 
-const createEmptyForm = (roles: Role[]): ApplicationTypeForm => ({
-  name: { ka: '', en: '' },
-  description: { ka: '', en: '' },
-  icon: 'FileText',
+const extractCustomFields = (fields: ApplicationFieldDefinition[]): CustomFieldForm[] => {
+  return fields
+    .filter((field) => !KNOWN_FIELD_KEYS.has(field.key))
+    .map((field) => ({
+      key: field.key,
+      labelKa: field.label.ka,
+      labelEn: field.label.en,
+      type: (field.type as CustomFieldType) ?? 'text',
+      required: Boolean(field.required)
+    }));
+};
+
+const buildDefaultFormState = (): FormState => ({
+  nameKa: '',
+  nameEn: '',
+  descriptionKa: '',
+  descriptionEn: '',
+  icon: 'Layers3',
   color: 'bg-slate-500',
-  fields: [createEmptyField()],
-  flow: roles.length ? [roles[0].id] : [],
-  sla: []
+  capabilities: {
+    requiresDateRange: true,
+    requiresTimeRange: false,
+    hasCommentField: true,
+    allowsAttachments: true
+  },
+  flow: [],
+  sla: [],
+  allowedRoleIds: [],
+  reasonLabelKa: 'განაცხადის მიზანი',
+  reasonLabelEn: 'Purpose',
+  commentLabelKa: 'დამატებითი კომენტარი',
+  commentLabelEn: 'Additional comment',
+  customFields: []
 });
 
-const totalApplicationsForType = (bundles: ApplicationBundle[], typeId: number) =>
-  bundles.filter((bundle) => bundle.application.typeId === typeId).length;
+const buildFormStateFromType = (type: ApplicationType): FormState => {
+  const reasonField = type.fields.find((field) => field.key === 'reason');
+  const commentField = type.fields.find((field) => field.key === 'additional_comment');
+  const form: FormState = {
+    nameKa: type.name.ka,
+    nameEn: type.name.en,
+    descriptionKa: type.description.ka,
+    descriptionEn: type.description.en,
+    icon: type.icon,
+    color: type.color,
+    capabilities: { ...type.capabilities },
+    flow: [...type.flow],
+    sla: type.slaPerStep.map((entry) => ({
+      stepIndex: entry.stepIndex,
+      hours: Math.max(1, Math.round(entry.seconds / 3600)),
+      onExpire: entry.onExpire
+    })),
+    allowedRoleIds: [...type.allowedRoleIds],
+    reasonLabelKa: reasonField?.label.ka ?? 'განაცხადის მიზანი',
+    reasonLabelEn: reasonField?.label.en ?? 'Purpose',
+    commentLabelKa: commentField?.label.ka ?? 'დამატებითი კომენტარი',
+    commentLabelEn: commentField?.label.en ?? 'Additional comment',
+    customFields: extractCustomFields(type.fields)
+  };
+  form.sla = syncSlaWithFlow(form.flow, form.sla);
+  return form;
+};
+
+const buildFields = (form: FormState): ApplicationFieldDefinition[] => {
+  const fields: ApplicationFieldDefinition[] = [
+    {
+      key: 'reason',
+      label: { ka: form.reasonLabelKa || 'განაცხადის მიზანი', en: form.reasonLabelEn || 'Purpose' },
+      type: 'textarea',
+      required: true,
+      placeholder: DEFAULT_REASON_PLACEHOLDER
+    }
+  ];
+
+  if (form.capabilities.requiresDateRange) {
+    fields.push({
+      key: 'start_date',
+      label: { ka: 'დაწყების თარიღი', en: 'Start date' },
+      type: 'date',
+      required: true
+    });
+    fields.push({
+      key: 'end_date',
+      label: { ka: 'დასრულების თარიღი', en: 'End date' },
+      type: 'date',
+      required: true
+    });
+  }
+
+  if (form.capabilities.requiresTimeRange) {
+    fields.push({
+      key: 'start_time',
+      label: { ka: 'დაწყების დრო', en: 'Start time' },
+      type: 'time',
+      required: false
+    });
+    fields.push({
+      key: 'end_time',
+      label: { ka: 'დასრულების დრო', en: 'End time' },
+      type: 'time',
+      required: false
+    });
+  }
+
+  if (form.capabilities.hasCommentField) {
+    fields.push({
+      key: 'additional_comment',
+      label: { ka: form.commentLabelKa || 'დამატებითი კომენტარი', en: form.commentLabelEn || 'Additional comment' },
+      type: 'textarea',
+      required: false,
+      placeholder: DEFAULT_COMMENT_PLACEHOLDER
+    });
+  }
+
+  form.customFields.forEach((field) => {
+    fields.push({
+      key: field.key,
+      label: { ka: field.labelKa, en: field.labelEn },
+      type: field.type,
+      required: field.required
+    } as ApplicationFieldDefinition);
+  });
+
+  return fields;
+};
+
+const validateForm = (form: FormState): boolean => {
+  if (!form.nameKa.trim() || !form.nameEn.trim()) {
+    return false;
+  }
+  if (!form.descriptionKa.trim() || !form.descriptionEn.trim()) {
+    return false;
+  }
+  if (!form.flow.length) {
+    return false;
+  }
+  if (form.customFields.some((field) => !field.key.trim() || !field.labelKa.trim() || !field.labelEn.trim())) {
+    return false;
+  }
+  const builtInKeys: string[] = ['reason'];
+  if (form.capabilities.requiresDateRange) {
+    builtInKeys.push('start_date', 'end_date');
+  }
+  if (form.capabilities.requiresTimeRange) {
+    builtInKeys.push('start_time', 'end_time');
+  }
+  if (form.capabilities.hasCommentField) {
+    builtInKeys.push('additional_comment');
+  }
+
+  const customKeys = form.customFields.map((field) => field.key.trim());
+  const allKeys = [...builtInKeys, ...customKeys].filter(Boolean);
+  const uniqueKeys = new Set(allKeys);
+  if (uniqueKeys.size !== allKeys.length) {
+    return false;
+  }
+  return true;
+};
 
 export const ApplicationTypesPage: React.FC<ApplicationTypesPageProps> = ({ language }) => {
   const {
-    roles,
-    applications,
     applicationTypes,
+    roles,
     hasPermission,
     createApplicationType,
     updateApplicationType,
@@ -400,172 +449,238 @@ export const ApplicationTypesPage: React.FC<ApplicationTypesPageProps> = ({ lang
   const t = COPY[language];
   const canManage = hasPermission('manage_request_types');
 
-  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(
-    applicationTypes[0]?.id ?? null
-  );
+  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(applicationTypes[0]?.id ?? null);
   const [mode, setMode] = useState<Mode>(applicationTypes.length ? 'view' : 'create');
-  const [formState, setFormState] = useState<ApplicationTypeForm>(
-    applicationTypes.length ? mapTypeToForm(applicationTypes[0]) : createEmptyForm(roles)
+  const [formState, setFormState] = useState<FormState>(() =>
+    applicationTypes[0] ? buildFormStateFromType(applicationTypes[0]) : buildDefaultFormState()
   );
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-
-  const selectedType = useMemo(
-    () => applicationTypes.find((type) => type.id === selectedTypeId) ?? null,
-    [applicationTypes, selectedTypeId]
+  const [allowedRolesOpen, setAllowedRolesOpen] = useState(false);
+  const allowedRolesDropdownRef = useRef<HTMLDivElement | null>(null);
+  const selectedRoles = useMemo(
+    () => roles.filter((role) => formState.allowedRoleIds.includes(role.id)),
+    [roles, formState.allowedRoleIds]
   );
+
+  const selectedType = useMemo(() => {
+    if (mode === 'create') {
+      return null;
+    }
+    return applicationTypes.find((type) => type.id === selectedTypeId) ?? null;
+  }, [applicationTypes, mode, selectedTypeId]);
 
   useEffect(() => {
     if (!applicationTypes.length) {
-      setMode('create');
       setSelectedTypeId(null);
-      setFormState(createEmptyForm(roles));
+      setMode('create');
+      setFormState(buildDefaultFormState());
       return;
     }
 
-    if (mode === 'create') {
-      return;
-    }
-
-    if (!selectedType) {
-      const fallback = applicationTypes[0];
-      setSelectedTypeId(fallback.id);
-      setFormState(mapTypeToForm(fallback));
+    if (selectedTypeId === null || !applicationTypes.some((type) => type.id === selectedTypeId)) {
+      setSelectedTypeId(applicationTypes[0].id);
       setMode('view');
-      return;
+      setFormState(buildFormStateFromType(applicationTypes[0]));
     }
+  }, [applicationTypes, selectedTypeId]);
 
-    setFormState(mapTypeToForm(selectedType));
-  }, [applicationTypes, mode, roles, selectedType]);
+  useEffect(() => {
+    if (selectedType && mode === 'view') {
+      setFormState(buildFormStateFromType(selectedType));
+    }
+  }, [selectedType, mode]);
 
-  const resetFeedback = () => {
+  useEffect(() => {
+    const handleClick = (event: MouseEvent) => {
+      if (!allowedRolesOpen) {
+        return;
+      }
+      if (
+        allowedRolesDropdownRef.current &&
+        event.target instanceof Node &&
+        !allowedRolesDropdownRef.current.contains(event.target)
+      ) {
+        setAllowedRolesOpen(false);
+      }
+    };
+
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setAllowedRolesOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [allowedRolesOpen]);
+
+  const startCreate = () => {
+    setMode('create');
+    setSelectedTypeId(null);
+    setFormState(buildDefaultFormState());
     setStatusMessage(null);
     setErrorMessage(null);
+    setAllowedRolesOpen(false);
   };
 
-  const handleSelectType = (type: ApplicationType) => {
-    resetFeedback();
-    setSelectedTypeId(type.id);
-    setMode('view');
-    setFormState(mapTypeToForm(type));
-  };
-
-  const handleStartCreate = () => {
-    resetFeedback();
-    setSelectedTypeId(null);
-    setMode('create');
-    setFormState(createEmptyForm(roles));
-  };
-
-  const handleEdit = () => {
+  const startEdit = () => {
     if (!selectedType) {
       return;
     }
-    resetFeedback();
     setMode('edit');
+    setFormState(buildFormStateFromType(selectedType));
+    setStatusMessage(null);
+    setErrorMessage(null);
+    setAllowedRolesOpen(false);
   };
 
-  const handleCancel = () => {
-    resetFeedback();
-    if (mode === 'create') {
-      if (applicationTypes.length) {
-        const fallback = applicationTypes[0];
-        setSelectedTypeId(fallback.id);
-        setMode('view');
-        setFormState(mapTypeToForm(fallback));
-      } else {
-        setFormState(createEmptyForm(roles));
-      }
+  const cancelEditing = () => {
+    if (!applicationTypes.length) {
+      setMode('create');
+      setFormState(buildDefaultFormState());
+      setSelectedTypeId(null);
+      setAllowedRolesOpen(false);
       return;
     }
-
     if (selectedType) {
-      setFormState(mapTypeToForm(selectedType));
+      setFormState(buildFormStateFromType(selectedType));
     }
     setMode('view');
+    setStatusMessage(null);
+    setErrorMessage(null);
+    setAllowedRolesOpen(false);
   };
 
-  const updateField = (index: number, updater: (field: FieldForm) => FieldForm) => {
-    setFormState((prev) => ({
-      ...prev,
-      fields: prev.fields.map((field, idx) => (idx === index ? updater(field) : field))
-    }));
+  const handleFlowRoleChange = (index: number, roleId: number) => {
+    setFormState((previous) => {
+      const nextFlow = previous.flow.map((current, idx) => (idx === index ? roleId : current));
+      return {
+        ...previous,
+        flow: nextFlow,
+        sla: syncSlaWithFlow(nextFlow, previous.sla)
+      };
+    });
   };
 
-  const updateSla = (index: number, updater: (entry: SlaForm) => SlaForm) => {
-    setFormState((prev) => ({
-      ...prev,
-      sla: prev.sla.map((entry, idx) => (idx === index ? updater(entry) : entry))
-    }));
-  };
-
-  const normalizeSlaAfterFlowChange = (flow: number[], currentSla: SlaForm[]): SlaForm[] => {
-    const lastIndex = flow.length - 1;
-    return currentSla
-      .map((entry) => {
-        if (entry.stepIndex > lastIndex) {
-          return null;
-        }
-        return entry;
-      })
-      .filter((entry): entry is SlaForm => Boolean(entry));
-  };
-
-  const validateForm = (): boolean => {
-    if (!formState.name.ka.trim() || !formState.name.en.trim()) {
-      return false;
-    }
-    if (!formState.description.ka.trim() || !formState.description.en.trim()) {
-      return false;
-    }
-    if (!formState.fields.length) {
-      return false;
-    }
-    if (formState.fields.some((field) => !field.key.trim() || !field.label.ka.trim() || !field.label.en.trim())) {
-      return false;
-    }
-    if (!formState.flow.length) {
-      return false;
-    }
-    return true;
-  };
-
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-    resetFeedback();
-
-    if (!validateForm()) {
-      setErrorMessage(`${t.validation} ${t.fieldValidation}`);
+  const handleAddFlowStep = () => {
+    if (!roles.length) {
       return;
     }
+    setFormState((previous) => {
+      const nextFlow = [...previous.flow, roles[0].id];
+      return {
+        ...previous,
+        flow: nextFlow,
+        sla: syncSlaWithFlow(nextFlow, previous.sla)
+      };
+    });
+  };
 
-    if (!canManage) {
-      setErrorMessage(t.noPermission);
+  const handleRemoveFlowStep = (index: number) => {
+    setFormState((previous) => {
+      const nextFlow = previous.flow.filter((_, idx) => idx !== index);
+      const nextSla = syncSlaWithFlow(nextFlow, previous.sla)
+        .map((entry, idx) => ({ ...entry, stepIndex: idx }));
+      return {
+        ...previous,
+        flow: nextFlow,
+        sla: nextSla
+      };
+    });
+  };
+
+  const handleSlaChange = (index: number, updates: Partial<SlaFormEntry>) => {
+    setFormState((previous) => {
+      const nextSla = previous.sla.map((entry) =>
+        entry.stepIndex === index ? { ...entry, ...updates } : entry
+      );
+      return {
+        ...previous,
+        sla: nextSla
+      };
+    });
+  };
+
+  const handleCustomFieldChange = (index: number, updates: Partial<CustomFieldForm>) => {
+    setFormState((previous) => {
+      const next = previous.customFields.map((field, idx) =>
+        idx === index ? { ...field, ...updates } : field
+      );
+      return { ...previous, customFields: next };
+    });
+  };
+
+  const addCustomField = () => {
+    setFormState((previous) => ({
+      ...previous,
+      customFields: [
+        ...previous.customFields,
+        {
+          key: `field_${previous.customFields.length + 1}`,
+          labelKa: '',
+          labelEn: '',
+          type: 'text',
+          required: false
+        }
+      ]
+    }));
+  };
+
+  const removeCustomField = (index: number) => {
+    setFormState((previous) => ({
+      ...previous,
+      customFields: previous.customFields.filter((_, idx) => idx !== index)
+    }));
+  };
+
+  const buildPayload = (): Omit<ApplicationType, 'id'> => ({
+    name: { ka: formState.nameKa.trim(), en: formState.nameEn.trim() },
+    description: { ka: formState.descriptionKa.trim(), en: formState.descriptionEn.trim() },
+    icon: formState.icon.trim() || 'Layers3',
+    color: formState.color.trim() || 'bg-slate-500',
+    fields: buildFields(formState),
+    flow: formState.flow.filter((roleId, index, array) => roleId && array.indexOf(roleId) === index),
+    slaPerStep: formState.sla.map((entry) => ({
+      stepIndex: entry.stepIndex,
+      seconds: Math.max(1, entry.hours) * 3600,
+      onExpire: entry.onExpire
+    })),
+    capabilities: formState.capabilities,
+    allowedRoleIds: Array.from(new Set(formState.allowedRoleIds.filter(Boolean)))
+  });
+
+  const handleSave = async () => {
+    setErrorMessage(null);
+    setStatusMessage(null);
+
+    if (!validateForm(formState)) {
+      setErrorMessage(t.validationError);
       return;
     }
 
     setIsSaving(true);
     try {
       if (mode === 'create') {
-        const payload = parseFormToType(formState) as Omit<ApplicationType, 'id'>;
-        const created = await createApplicationType(payload);
-        setSelectedTypeId(created.id);
-        setFormState(mapTypeToForm(created));
+        const created = await createApplicationType(buildPayload());
+        setStatusMessage(t.successCreated);
         setMode('view');
-        setStatusMessage(t.created);
-      } else if (mode === 'edit' && selectedType) {
-        const payload = parseFormToType({ ...formState, id: selectedType.id }) as ApplicationType;
-        const updated = await updateApplicationType(payload);
-        if (updated) {
-          setFormState(mapTypeToForm(updated));
-          setStatusMessage(t.updated);
-          setMode('view');
-        }
+        setSelectedTypeId(created.id);
+        setAllowedRolesOpen(false);
+      } else if (selectedType) {
+        await updateApplicationType({ id: selectedType.id, ...buildPayload() });
+        setStatusMessage(t.successUpdated);
+        setMode('view');
+        setAllowedRolesOpen(false);
       }
     } catch (error) {
       console.error(error);
-      setErrorMessage('Something went wrong.');
+      setErrorMessage('ქმედება ვერ შესრულდა, სცადეთ ხელახლა.');
     } finally {
       setIsSaving(false);
     }
@@ -575,666 +690,553 @@ export const ApplicationTypesPage: React.FC<ApplicationTypesPageProps> = ({ lang
     if (!selectedType) {
       return;
     }
-    resetFeedback();
-    if (!canManage) {
-      setErrorMessage(t.noPermission);
+    const confirmMessage =
+      language === 'ka'
+        ? 'დარწმუნებული ხართ, რომ გსურთ ტიპის წაშლა?'
+        : 'Are you sure you want to delete this type?';
+    if (!window.confirm(confirmMessage)) {
       return;
     }
-
-    setIsSaving(true);
     try {
-      const removed = await deleteApplicationType(selectedType.id);
-      if (removed) {
-        setStatusMessage(t.deleted);
-        const remaining = applicationTypes.filter((type) => type.id !== selectedType.id);
-        if (remaining.length) {
-          const fallback = remaining[0];
-          setSelectedTypeId(fallback.id);
-          setFormState(mapTypeToForm(fallback));
-          setMode('view');
-        } else {
-          setSelectedTypeId(null);
-          setMode('create');
-          setFormState(createEmptyForm(roles));
-        }
+      const deleted = await deleteApplicationType(selectedType.id);
+      if (deleted) {
+        setStatusMessage(t.successDeleted);
+        setMode(applicationTypes.length > 1 ? 'view' : 'create');
+        const nextSelected = applicationTypes.find((type) => type.id !== selectedType.id);
+        setSelectedTypeId(nextSelected?.id ?? null);
+        setFormState(nextSelected ? buildFormStateFromType(nextSelected) : buildDefaultFormState());
+        setAllowedRolesOpen(false);
       }
     } catch (error) {
       console.error(error);
-      setErrorMessage('Unable to delete type.');
-    } finally {
-      setIsSaving(false);
+      setErrorMessage('ტიპის წაშლა ვერ მოხერხდა.');
     }
   };
 
   if (!canManage) {
     return (
-      <div className="bg-white shadow rounded-xl p-10 text-center">
-        <Layers3 className="w-12 h-12 text-rose-400 mx-auto mb-4" />
-        <p className="text-lg font-semibold text-slate-700 mb-2">{t.title}</p>
-        <p className="text-slate-500">{t.noPermission}</p>
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-700">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="mt-1 h-5 w-5" />
+          <div>
+            <h2 className="text-lg font-semibold">{t.title}</h2>
+            <p className="mt-1 text-sm">{t.noPermission}</p>
+          </div>
+        </div>
       </div>
     );
   }
 
+  const IconPreview = getIconComponent(formState.icon);
+
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-8">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Settings2 className="w-6 h-6 text-indigo-500" />
-            {t.title}
-          </h1>
-          <p className="text-slate-500">{t.subtitle}</p>
+          <h1 className="text-3xl font-bold text-slate-800">{t.title}</h1>
+          <p className="mt-2 text-slate-600">{t.subtitle}</p>
         </div>
         <button
           type="button"
-          onClick={handleStartCreate}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white shadow hover:bg-indigo-500 transition"
+          onClick={startCreate}
+          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-blue-700"
         >
-          <PlusCircle className="w-4 h-4" />
-          {t.newType}
+          <PlusCircle className="h-4 w-4" />
+          {t.create}
         </button>
-      </header>
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[320px,1fr] gap-6">
-        <aside className="bg-white rounded-xl shadow border border-slate-100">
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-              <Layers3 className="w-5 h-5 text-slate-500" />
-              {t.title}
-            </h2>
-            <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full">
-              {applicationTypes.length}
-            </span>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {applicationTypes.length === 0 && (
-              <div className="p-6 text-center text-slate-500 text-sm">{t.emptyList}</div>
-            )}
-            {applicationTypes.map((type) => {
-              const isActive = type.id === selectedTypeId;
-              const usageCount = totalApplicationsForType(applications, type.id);
-              return (
-                <button
-                  key={type.id}
-                  type="button"
-                  onClick={() => handleSelectType(type)}
-                  className={`w-full text-left px-5 py-4 transition flex flex-col gap-2 ${
-                    isActive ? 'bg-indigo-50 border-l-4 border-indigo-500' : 'hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-800">{type.name[language]}</span>
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${type.color} text-white`}>
-                      {type.icon}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 line-clamp-2">{type.description[language]}</p>
-                  <div className="flex flex-wrap gap-2 text-[11px] text-slate-500">
-                    <span className="inline-flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-full">
-                      <Clock3 className="w-3 h-3" />
-                      {flowToBadge(type.flow, roles, language)}
-                    </span>
-                    <span className="inline-flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-full">
-                      <CheckCircle2 className="w-3 h-3" />
-                      {usageCount}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </aside>
+      <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
+        <div className="space-y-3">
+          {applicationTypes.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-slate-500">
+              {t.empty}
+            </div>
+          )}
 
-        <section className="bg-white rounded-xl shadow border border-slate-100">
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-slate-900">
-                  {mode === 'create' ? t.createTitle : mode === 'edit' ? t.editTitle : t.viewTitle}
-                </h2>
-                {statusMessage && <p className="text-sm text-emerald-600 mt-2">{statusMessage}</p>}
-                {errorMessage && <p className="text-sm text-rose-500 mt-2">{errorMessage}</p>}
-              </div>
-              {mode === 'view' && selectedType && (
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleEdit}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:border-slate-300"
-                  >
-                    <PencilLine className="w-4 h-4" />
-                    {language === 'ka' ? 'რედაქტირება' : 'Edit'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDelete}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 hover:border-rose-300"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    {t.delete}
-                  </button>
+          {applicationTypes.map((type) => {
+            const Icon = getIconComponent(type.icon);
+            const active = selectedTypeId === type.id && mode !== 'create';
+            return (
+              <button
+                key={type.id}
+                type="button"
+                onClick={() => {
+                  setSelectedTypeId(type.id);
+                  setMode('view');
+                  setFormState(buildFormStateFromType(type));
+                  setStatusMessage(null);
+                  setErrorMessage(null);
+                }}
+                className={`w-full rounded-2xl border px-5 py-4 text-left shadow-sm transition ${
+                  active ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-200'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-full ${type.color}`}>
+                    <Icon className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">{type.name[language]}</p>
+                    <p className="text-xs text-slate-500 line-clamp-2">{type.description[language]}</p>
+                  </div>
                 </div>
-              )}
-            </div>
+              </button>
+            );
+          })}
+        </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-slate-700">{t.nameLabel} (KA)</span>
-                <input
-                  type="text"
-                  value={formState.name.ka}
-                  onChange={(event) =>
-                    setFormState((prev) => ({
-                      ...prev,
-                      name: { ...prev.name, ka: event.target.value }
-                    }))
-                  }
-                  disabled={mode === 'view'}
-                  className={INPUT_CLASS}
-                  placeholder="შვებულების განაცხადი"
-                />
-              </label>
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-slate-700">{t.nameLabel} (EN)</span>
-                <input
-                  type="text"
-                  value={formState.name.en}
-                  onChange={(event) =>
-                    setFormState((prev) => ({
-                      ...prev,
-                      name: { ...prev.name, en: event.target.value }
-                    }))
-                  }
-                  disabled={mode === 'view'}
-                  className={INPUT_CLASS}
-                  placeholder="Leave request"
-                />
-              </label>
-              <label className="flex flex-col gap-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">{t.descriptionLabel} (KA)</span>
-                <textarea
-                  value={formState.description.ka}
-                  onChange={(event) =>
-                    setFormState((prev) => ({
-                      ...prev,
-                      description: { ...prev.description, ka: event.target.value }
-                    }))
-                  }
-                  disabled={mode === 'view'}
-                  className={`${INPUT_CLASS} min-h-[90px]`}
-                />
-              </label>
-              <label className="flex flex-col gap-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">{t.descriptionLabel} (EN)</span>
-                <textarea
-                  value={formState.description.en}
-                  onChange={(event) =>
-                    setFormState((prev) => ({
-                      ...prev,
-                      description: { ...prev.description, en: event.target.value }
-                    }))
-                  }
-                  disabled={mode === 'view'}
-                  className={`${INPUT_CLASS} min-h-[90px]`}
-                />
-              </label>
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-slate-700">{t.iconLabel}</span>
-                <input
-                  type="text"
-                  value={formState.icon}
-                  onChange={(event) => setFormState((prev) => ({ ...prev, icon: event.target.value }))}
-                  disabled={mode === 'view'}
-                  className={INPUT_CLASS}
-                  placeholder="CalendarDays"
-                />
-              </label>
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-slate-700">{t.colorLabel}</span>
-                <input
-                  type="text"
-                  value={formState.color}
-                  onChange={(event) => setFormState((prev) => ({ ...prev, color: event.target.value }))}
-                  disabled={mode === 'view'}
-                  className={INPUT_CLASS}
-                  placeholder="bg-sky-500"
-                />
-                <span className="text-xs text-slate-400">{t.colorHelp}</span>
-              </label>
+        <div className="rounded-3xl bg-white p-8 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold text-slate-800">
+                {mode === 'create' ? t.create : mode === 'edit' ? t.edit : t.view}
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {mode === 'create' ? t.subtitle : selectedType?.description[language] ?? t.subtitle}
+              </p>
             </div>
+            <div className={`flex h-12 w-12 items-center justify-center rounded-full ${formState.color}`}>
+              <IconPreview className="h-6 w-6 text-white" />
+            </div>
+          </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-slate-800">{t.fieldSection}</h3>
-                {mode !== 'view' && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormState((prev) => ({ ...prev, fields: [...prev.fields, createEmptyField()] }))
-                    }
-                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:border-slate-300"
-                  >
-                    <PlusCircle className="w-4 h-4" />
-                    {t.addField}
-                  </button>
-                )}
+          <div className="mt-6 space-y-6">
+            <section>
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                {t.basicInformation}
+              </h3>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-slate-700" htmlFor="nameKa">
+                    {t.nameKa}
+                  </label>
+                  <input
+                    id="nameKa"
+                    value={formState.nameKa}
+                    onChange={(event) => setFormState((prev) => ({ ...prev, nameKa: event.target.value }))}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-slate-700" htmlFor="nameEn">
+                    {t.nameEn}
+                  </label>
+                  <input
+                    id="nameEn"
+                    value={formState.nameEn}
+                    onChange={(event) => setFormState((prev) => ({ ...prev, nameEn: event.target.value }))}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-slate-700" htmlFor="descriptionKa">
+                    {t.descriptionKa}
+                  </label>
+                  <textarea
+                    id="descriptionKa"
+                    rows={3}
+                    value={formState.descriptionKa}
+                    onChange={(event) => setFormState((prev) => ({ ...prev, descriptionKa: event.target.value }))}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-slate-700" htmlFor="descriptionEn">
+                    {t.descriptionEn}
+                  </label>
+                  <textarea
+                    id="descriptionEn"
+                    rows={3}
+                    value={formState.descriptionEn}
+                    onChange={(event) => setFormState((prev) => ({ ...prev, descriptionEn: event.target.value }))}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-slate-700" htmlFor="icon">
+                    {t.iconLabel}
+                  </label>
+                  <input
+                    id="icon"
+                    value={formState.icon}
+                    onChange={(event) => setFormState((prev) => ({ ...prev, icon: event.target.value }))}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-slate-700" htmlFor="color">
+                    {t.colorLabel}
+                  </label>
+                  <input
+                    id="color"
+                    value={formState.color}
+                    onChange={(event) => setFormState((prev) => ({ ...prev, color: event.target.value }))}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-slate-400">{t.colorHint}</p>
+                </div>
               </div>
-              <div className="space-y-4">
-                {formState.fields.map((field, index) => (
-                  <div key={index} className="border border-slate-200 rounded-lg p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-slate-700">{t.stepLabel(index)}</span>
-                      {mode !== 'view' && (
+            </section>
+
+            <section className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                  {t.fieldSettings}
+                </h3>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-slate-700">{t.reasonLabel}</label>
+                  <input
+                    value={formState.reasonLabelKa}
+                    onChange={(event) => setFormState((prev) => ({ ...prev, reasonLabelKa: event.target.value }))}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="ქართული"
+                  />
+                  <input
+                    value={formState.reasonLabelEn}
+                    onChange={(event) => setFormState((prev) => ({ ...prev, reasonLabelEn: event.target.value }))}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="English"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-slate-700">{t.commentLabel}</label>
+                  <input
+                    value={formState.commentLabelKa}
+                    onChange={(event) => setFormState((prev) => ({ ...prev, commentLabelKa: event.target.value }))}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="ქართული"
+                  />
+                  <input
+                    value={formState.commentLabelEn}
+                    onChange={(event) => setFormState((prev) => ({ ...prev, commentLabelEn: event.target.value }))}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="English"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                {Object.entries(formState.capabilities).map(([key, value]) => (
+                  <label key={key} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(value)}
+                      onChange={(event) =>
+                        setFormState((prev) => ({
+                          ...prev,
+                          capabilities: {
+                            ...prev.capabilities,
+                            [key]: event.target.checked
+                          }
+                        }))
+                      }
+                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    {t.toggles[key as keyof ApplicationTypeCapabilities]}
+                  </label>
+                ))}
+              </div>
+            </section>
+
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                {t.allowedRoles}
+              </h3>
+              <div className="relative max-w-xl" ref={allowedRolesDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setAllowedRolesOpen((previous) => !previous)}
+                  className="flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-left text-sm font-medium text-slate-600 shadow-sm transition hover:border-blue-200 hover:text-blue-600"
+                >
+                  <span>
+                    {selectedRoles.length
+                      ? selectedRoles.map((role) => role.name).join(', ')
+                      : t.selectRole}
+                  </span>
+                  <Layers3 className="h-4 w-4 text-slate-400" />
+                </button>
+                {allowedRolesOpen && (
+                  <div className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-200 bg-white shadow-xl">
+                    <div className="max-h-60 overflow-y-auto p-2">
+                      {roles.length === 0 && (
+                        <p className="px-3 py-2 text-sm text-slate-500">
+                          {language === 'ka' ? 'როლები ჯერ არ არის შექმნილი.' : 'No roles available.'}
+                        </p>
+                      )}
+                      {roles.map((role) => {
+                        const checked = formState.allowedRoleIds.includes(role.id);
+                        return (
+                          <label
+                            key={role.id}
+                            className="flex cursor-pointer items-start gap-3 rounded-xl px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(event) =>
+                                setFormState((prev) => ({
+                                  ...prev,
+                                  allowedRoleIds: event.target.checked
+                                    ? [...prev.allowedRoleIds, role.id]
+                                    : prev.allowedRoleIds.filter((id) => id !== role.id)
+                                }))
+                              }
+                              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span>
+                              <span className="font-semibold text-slate-700">{role.name}</span>
+                              <span className="block text-xs text-slate-400">{role.description}</span>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-center justify-between border-t border-slate-100 px-3 py-2 text-xs text-slate-400">
+                      <span>
+                        {selectedRoles.length
+                          ? language === 'ka'
+                            ? `${selectedRoles.length} როლი შერჩეულია`
+                            : `${selectedRoles.length} roles selected`
+                          : t.selectRole}
+                      </span>
+                      {selectedRoles.length > 0 && (
                         <button
                           type="button"
-                          onClick={() =>
-                            setFormState((prev) => ({
-                              ...prev,
-                              fields: prev.fields.filter((_, idx) => idx !== index)
-                            }))
-                          }
-                          className="text-rose-500 hover:text-rose-600 text-xs"
+                          onClick={() => setFormState((prev) => ({ ...prev, allowedRoleIds: [] }))}
+                          className="text-xs font-semibold text-rose-500 hover:text-rose-600"
                         >
-                          {t.removeField}
+                          {language === 'ka' ? 'გასუფთავება' : 'Clear'}
                         </button>
                       )}
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-slate-600">{t.fieldKey}</span>
-                        <input
-                          type="text"
-                          value={field.key}
-                          onChange={(event) =>
-                            updateField(index, (current) => ({ ...current, key: event.target.value }))
-                          }
-                          disabled={mode === 'view'}
-                          className={INPUT_CLASS}
-                        />
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-slate-600">{t.fieldType}</span>
-                        <select
-                          value={field.type}
-                          onChange={(event) =>
-                            updateField(index, (current) => ({
-                              ...current,
-                              type: event.target.value as ApplicationFieldType
-                            }))
-                          }
-                          disabled={mode === 'view'}
-                          className={INPUT_CLASS}
+                  </div>
+                )}
+              </div>
+              {selectedRoles.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {selectedRoles.map((role) => (
+                    <span
+                      key={role.id}
+                      className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600"
+                    >
+                      <ShieldCheck className="h-3 w-3" />
+                      {role.name}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">{t.selectRole}</p>
+              )}
+            </section>
+
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                  {t.customFieldTitle}
+                </h3>
+                <button
+                  type="button"
+                  onClick={addCustomField}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  <PlusCircle className="h-3.5 w-3.5" />
+                  {t.addCustomField}
+                </button>
+              </div>
+              <div className="space-y-4">
+                {formState.customFields.map((field, index) => (
+                  <div key={index} className="rounded-2xl border border-slate-200 p-4">
+                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                      <div className="grid flex-1 gap-3 md:grid-cols-2">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-xs font-semibold uppercase text-slate-500">{t.fieldKey}</label>
+                          <input
+                            value={field.key}
+                            onChange={(event) => handleCustomFieldChange(index, { key: event.target.value })}
+                            className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-xs font-semibold uppercase text-slate-500">{t.fieldType}</label>
+                          <select
+                            value={field.type}
+                            onChange={(event) => handleCustomFieldChange(index, { type: event.target.value as CustomFieldType })}
+                            className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            {(Object.keys(t.customFieldTypes) as CustomFieldType[]).map((option) => (
+                              <option key={option} value={option}>
+                                {t.customFieldTypes[option]}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-xs font-semibold uppercase text-slate-500">{t.fieldLabelKa}</label>
+                          <input
+                            value={field.labelKa}
+                            onChange={(event) => handleCustomFieldChange(index, { labelKa: event.target.value })}
+                            className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-xs font-semibold uppercase text-slate-500">{t.fieldLabelEn}</label>
+                          <input
+                            value={field.labelEn}
+                            onChange={(event) => handleCustomFieldChange(index, { labelEn: event.target.value })}
+                            className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between gap-3 md:mt-0 md:flex-col md:items-end md:justify-center">
+                        <label className="flex items-center gap-2 text-xs font-semibold uppercase text-slate-500">
+                          <input
+                            type="checkbox"
+                            checked={field.required}
+                            onChange={(event) => handleCustomFieldChange(index, { required: event.target.checked })}
+                            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          {t.fieldRequired}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => removeCustomField(index)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50"
                         >
-                          {FIELD_TYPES.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label[language]}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={field.required}
-                          onChange={(event) =>
-                            updateField(index, (current) => ({
-                              ...current,
-                              required: event.target.checked
-                            }))
-                          }
-                          disabled={mode === 'view'}
-                          className="h-4 w-4 rounded border-slate-300"
-                        />
-                        <span className="text-xs font-medium text-slate-600">{t.fieldRequired}</span>
-                      </label>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-slate-600">{t.fieldLabelKa}</span>
-                        <input
-                          type="text"
-                          value={field.label.ka}
-                          onChange={(event) =>
-                            updateField(index, (current) => ({
-                              ...current,
-                              label: { ...current.label, ka: event.target.value }
-                            }))
-                          }
-                          disabled={mode === 'view'}
-                          className={INPUT_CLASS}
-                        />
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-slate-600">{t.fieldLabelEn}</span>
-                        <input
-                          type="text"
-                          value={field.label.en}
-                          onChange={(event) =>
-                            updateField(index, (current) => ({
-                              ...current,
-                              label: { ...current.label, en: event.target.value }
-                            }))
-                          }
-                          disabled={mode === 'view'}
-                          className={INPUT_CLASS}
-                        />
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-slate-600">{t.fieldPlaceholderKa}</span>
-                        <input
-                          type="text"
-                          value={field.placeholder.ka}
-                          onChange={(event) =>
-                            updateField(index, (current) => ({
-                              ...current,
-                              placeholder: { ...current.placeholder, ka: event.target.value }
-                            }))
-                          }
-                          disabled={mode === 'view'}
-                          className={INPUT_CLASS}
-                        />
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-slate-600">{t.fieldPlaceholderEn}</span>
-                        <input
-                          type="text"
-                          value={field.placeholder.en}
-                          onChange={(event) =>
-                            updateField(index, (current) => ({
-                              ...current,
-                              placeholder: { ...current.placeholder, en: event.target.value }
-                            }))
-                          }
-                          disabled={mode === 'view'}
-                          className={INPUT_CLASS}
-                        />
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-slate-600">{t.fieldHelperKa}</span>
-                        <input
-                          type="text"
-                          value={field.helper.ka}
-                          onChange={(event) =>
-                            updateField(index, (current) => ({
-                              ...current,
-                              helper: { ...current.helper, ka: event.target.value }
-                            }))
-                          }
-                          disabled={mode === 'view'}
-                          className={INPUT_CLASS}
-                        />
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-slate-600">{t.fieldHelperEn}</span>
-                        <input
-                          type="text"
-                          value={field.helper.en}
-                          onChange={(event) =>
-                            updateField(index, (current) => ({
-                              ...current,
-                              helper: { ...current.helper, en: event.target.value }
-                            }))
-                          }
-                          disabled={mode === 'view'}
-                          className={INPUT_CLASS}
-                        />
-                      </label>
-                      <label className="flex flex-col gap-1 md:col-span-2">
-                        <span className="text-xs font-medium text-slate-600">{t.fieldOptions}</span>
-                        <textarea
-                          value={field.optionsText}
-                          onChange={(event) =>
-                            updateField(index, (current) => ({
-                              ...current,
-                              optionsText: event.target.value
-                            }))
-                          }
-                          disabled={mode === 'view'}
-                          className={`${INPUT_CLASS} min-h-[70px]`}
-                          placeholder="value|ქართული|English"
-                        />
-                        <span className="text-[11px] text-slate-400">{t.fieldOptionsHelp}</span>
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-slate-600">{t.fieldEditableSteps}</span>
-                        <input
-                          type="text"
-                          value={field.editableStepsText}
-                          onChange={(event) =>
-                            updateField(index, (current) => ({
-                              ...current,
-                              editableStepsText: event.target.value
-                            }))
-                          }
-                          disabled={mode === 'view'}
-                          className={INPUT_CLASS}
-                          placeholder="0,2"
-                        />
-                      </label>
+                          <Trash2 className="h-3.5 w-3.5" />
+                          {language === 'ka' ? 'წაშლა' : 'Remove'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
 
-            <div className="space-y-4">
+            <section className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-slate-800">{t.flowSection}</h3>
-                {mode !== 'view' && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormState((prev) => {
-                        const nextFlow = [...prev.flow, roles[0]?.id ?? 0];
-                        return {
-                          ...prev,
-                          flow: nextFlow,
-                          sla: normalizeSlaAfterFlowChange(nextFlow, prev.sla)
-                        };
-                      })
-                    }
-                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:border-slate-300"
-                  >
-                    <PlusCircle className="w-4 h-4" />
-                    {t.addStep}
-                  </button>
-                )}
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                  {t.flowTitle}
+                </h3>
+                <button
+                  type="button"
+                  onClick={handleAddFlowStep}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  <Settings2 className="h-3.5 w-3.5" />
+                  {t.addStep}
+                </button>
               </div>
               <div className="space-y-3">
                 {formState.flow.map((roleId, index) => (
-                  <div key={`${roleId}-${index}`} className="flex flex-col md:flex-row md:items-center gap-3">
-                    <div className="flex-1">
-                      <label className="text-xs font-medium text-slate-600 block mb-1">
-                        {t.stepLabel(index)}
-                      </label>
-                      <select
-                        value={roleId}
-                        onChange={(event) =>
-                          setFormState((prev) => {
-                            const nextFlow = prev.flow.map((value, idx) =>
-                              idx === index ? Number.parseInt(event.target.value, 10) : value
-                            );
-                            return {
-                              ...prev,
-                              flow: nextFlow,
-                              sla: normalizeSlaAfterFlowChange(nextFlow, prev.sla)
-                            };
-                          })
-                        }
-                        disabled={mode === 'view'}
-                        className={INPUT_CLASS}
-                      >
-                        {roles.map((role) => (
-                          <option key={role.id} value={role.id}>
-                            {role.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    {mode !== 'view' && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setFormState((prev) => {
-                            const nextFlow = prev.flow.filter((_, idx) => idx !== index);
-                            return {
-                              ...prev,
-                              flow: nextFlow,
-                              sla: normalizeSlaAfterFlowChange(nextFlow, prev.sla).map((entry) => {
-                                if (entry.stepIndex > index) {
-                                  return { ...entry, stepIndex: entry.stepIndex - 1 };
-                                }
-                                if (entry.stepIndex === index) {
-                                  return null;
-                                }
-                                return entry;
-                              }).filter((entry): entry is SlaForm => Boolean(entry))
-                            };
-                          })
-                        }
-                        className="text-xs text-rose-500 hover:text-rose-600"
-                      >
-                        {t.removeStep}
-                      </button>
-                    )}
+                  <div key={`${roleId}-${index}`} className="flex items-center gap-3 rounded-2xl border border-slate-200 p-4">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white">
+                      {index + 1}
+                    </span>
+                    <select
+                      value={roleId}
+                      onChange={(event) => handleFlowRoleChange(index, Number(event.target.value))}
+                      className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {roles.map((role) => (
+                        <option key={role.id} value={role.id}>
+                          {role.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFlowStep(index)}
+                      className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-slate-800">{t.slaSection}</h3>
-                {mode !== 'view' && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormState((prev) => {
-                        const defaultStepIndex = prev.flow.length
-                          ? Math.max(0, prev.flow.length - 1)
-                          : 0;
-                        return {
-                          ...prev,
-                          sla: [
-                            ...prev.sla,
-                            {
-                              stepIndex: defaultStepIndex,
-                              hours: 24,
-                              onExpire: 'AUTO_APPROVE'
-                            }
-                          ]
-                        };
-                      })
-                    }
-                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:border-slate-300"
-                  >
-                    <PlusCircle className="w-4 h-4" />
-                    {t.addSla}
-                  </button>
-                )}
-              </div>
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                {t.slaTitle}
+              </h3>
               <div className="space-y-3">
-                {formState.sla.map((entry, index) => (
-                  <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-3 border border-slate-200 rounded-lg p-4">
-                    <label className="flex flex-col gap-1">
-                      <span className="text-xs font-medium text-slate-600">{t.slaStep}</span>
-                      <select
-                        value={entry.stepIndex}
-                        onChange={(event) =>
-                          updateSla(index, (current) => ({
-                            ...current,
-                            stepIndex: Number.parseInt(event.target.value, 10)
-                          }))
-                        }
-                        disabled={mode === 'view'}
-                        className={INPUT_CLASS}
-                      >
-                        {formState.flow.map((_, stepIndex) => (
-                          <option key={stepIndex} value={stepIndex}>
-                            {t.stepLabel(stepIndex)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-xs font-medium text-slate-600">{t.slaHours}</span>
-                      <input
-                        type="number"
-                        min={1}
-                        value={entry.hours}
-                        onChange={(event) =>
-                          updateSla(index, (current) => ({
-                            ...current,
-                            hours: Number.parseInt(event.target.value, 10) || 1
-                          }))
-                        }
-                        disabled={mode === 'view'}
-                        className={INPUT_CLASS}
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1 md:col-span-2">
-                      <span className="text-xs font-medium text-slate-600">{t.slaAction}</span>
-                      <select
-                        value={entry.onExpire}
-                        onChange={(event) =>
-                          updateSla(index, (current) => ({
-                            ...current,
-                            onExpire: event.target.value as ApplicationStepSLA['onExpire']
-                          }))
-                        }
-                        disabled={mode === 'view'}
-                        className={INPUT_CLASS}
-                      >
-                        {Object.entries(SLA_ACTION_LABELS).map(([key, label]) => (
-                          <option key={key} value={key}>
-                            {label[language]}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    {mode !== 'view' && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setFormState((prev) => ({
-                            ...prev,
-                            sla: prev.sla.filter((_, idx) => idx !== index)
-                          }))
-                        }
-                        className="text-xs text-rose-500 hover:text-rose-600"
-                      >
-                        {t.removeSla}
-                      </button>
-                    )}
+                {formState.sla.map((entry) => (
+                  <div key={entry.stepIndex} className="grid gap-3 md:grid-cols-[auto_1fr_1fr]">
+                    <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                      <Clock3 className="h-4 w-4 text-blue-500" />
+                      <span>{entry.stepIndex + 1}</span>
+                    </div>
+                    <input
+                      type="number"
+                      min={1}
+                      value={entry.hours}
+                      onChange={(event) => handleSlaChange(entry.stepIndex, { hours: Number(event.target.value) })}
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder={t.hours}
+                    />
+                    <select
+                      value={entry.onExpire}
+                      onChange={(event) => handleSlaChange(entry.stepIndex, { onExpire: event.target.value as ApplicationStepSLA['onExpire'] })}
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {(Object.keys(t.expireActions) as ApplicationStepSLA['onExpire'][]).map((option) => (
+                        <option key={option} value={option}>
+                          {t.expireActions[option]}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
+          </div>
 
-            {mode !== 'view' && (
-              <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
+          {errorMessage && <p className="mt-4 rounded-lg bg-rose-50 px-4 py-2 text-sm text-rose-600">{errorMessage}</p>}
+          {statusMessage && <p className="mt-4 rounded-lg bg-emerald-50 px-4 py-2 text-sm text-emerald-700">{statusMessage}</p>}
+
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleSave}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+              disabled={isSaving}
+            >
+              <Save className="h-4 w-4" />
+              {isSaving ? t.actions.saving : t.actions.save}
+            </button>
+            <button
+              type="button"
+              onClick={cancelEditing}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+            >
+              {t.actions.cancel}
+            </button>
+            {mode !== 'create' && selectedType && (
+              <>
                 <button
                   type="button"
-                  onClick={handleCancel}
-                  className="inline-flex items-center justify-center px-4 py-2 rounded-lg border border-slate-200 text-slate-700 hover:border-slate-300"
+                  onClick={startEdit}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
                 >
-                  {t.cancel}
+                  <PencilLine className="h-4 w-4" />
+                  {t.edit}
                 </button>
                 <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="inline-flex items-center justify-center px-5 py-2 rounded-lg bg-indigo-600 text-white shadow hover:bg-indigo-500 disabled:opacity-60"
+                  type="button"
+                  onClick={handleDelete}
+                  className="inline-flex items-center gap-2 rounded-lg bg-rose-50 px-5 py-2.5 text-sm font-semibold text-rose-600 hover:bg-rose-100"
                 >
-                  {isSaving ? t.saving : mode === 'create' ? t.confirmCreate : t.confirmUpdate}
+                  <Trash2 className="h-4 w-4" />
+                  {t.actions.delete}
                 </button>
-              </div>
+              </>
             )}
-          </form>
-        </section>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
-
-export default ApplicationTypesPage;
