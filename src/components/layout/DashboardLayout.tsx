@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { LayoutDashboard, UserCog, Shield, Users, Lock, Ticket as TicketIcon } from 'lucide-react';
+import { LayoutDashboard, UserCog, Shield, Users, Lock, Ticket as TicketIcon, FileText } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import { DashboardPage } from '../../pages/DashboardPage';
 import { ProfilePage } from '../../pages/ProfilePage';
@@ -7,6 +7,7 @@ import { RolesPage } from '../../pages/RolesPage';
 import { UsersPage } from '../../pages/UsersPage';
 import { PermissionsPage } from '../../pages/PermissionsPage';
 import { TicketsPage } from '../../pages/TicketsPage';
+import { ApplicationsPage } from '../../pages/ApplicationsPage';
 import { MainLayout, MenuItem } from './MainLayout';
 
 const MENU_DEFINITIONS: MenuItem[] = [
@@ -15,6 +16,7 @@ const MENU_DEFINITIONS: MenuItem[] = [
   { id: 'roles', icon: Shield, label: { ka: 'როლები', en: 'Roles' } },
   { id: 'users', icon: Users, label: { ka: 'მომხმარებლები', en: 'Users' } },
   { id: 'tickets', icon: TicketIcon, label: { ka: 'თიკეტები', en: 'Tickets' } },
+  { id: 'applications', icon: FileText, label: { ka: 'განაცხადები', en: 'Applications' } },
   { id: 'permissions', icon: Lock, label: { ka: 'უფლებები', en: 'Permissions' } }
 ];
 
@@ -24,6 +26,7 @@ const MENU_PERMISSIONS: Record<string, string> = {
   roles: 'view_roles',
   users: 'view_users',
   tickets: 'view_tickets',
+  applications: 'view_requests',
   permissions: 'manage_permissions'
 };
 
@@ -56,6 +59,8 @@ export const DashboardLayout: React.FC = () => {
         return <UsersPage language={language} />;
       case 'tickets':
         return <TicketsPage language={language} />;
+      case 'applications':
+        return <ApplicationsPage language={language} />;
       case 'permissions':
         return <PermissionsPage language={language} />;
       default:
