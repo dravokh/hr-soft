@@ -156,6 +156,13 @@ export interface AppContextValue {
   saveUsers: (users: User[]) => Promise<void>;
   saveTickets: (tickets: Ticket[]) => Promise<void>;
   saveApplications: (applications: ApplicationBundle[]) => Promise<void>;
+  saveApplicationTypes: (
+    types: ApplicationType[],
+    applicationUpdater?: (current: ApplicationBundle[]) => ApplicationBundle[]
+  ) => Promise<void>;
+  createApplicationType: (payload: Omit<ApplicationType, 'id'>) => Promise<ApplicationType>;
+  updateApplicationType: (payload: ApplicationType) => Promise<ApplicationType | null>;
+  deleteApplicationType: (typeId: number) => Promise<boolean>;
   createApplication: (
     payload: Omit<Application, 'id' | 'number' | 'status' | 'currentStepIndex' | 'createdAt' | 'updatedAt' | 'submittedAt' | 'dueAt'> & {
       values: ApplicationFieldValue[];
