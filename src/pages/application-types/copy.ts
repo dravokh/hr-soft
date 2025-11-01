@@ -1,5 +1,4 @@
 import type { ApplicationTypeCapabilities, ApplicationStepSLA } from './types';
-import type { CustomFieldType } from './types';
 
 export interface ApplicationTypesCopy {
   title: string;
@@ -17,8 +16,6 @@ export interface ApplicationTypesCopy {
   colorLabel: string;
   colorHint: string;
   fieldSettings: string;
-  reasonLabel: string;
-  commentLabel: string;
   toggles: {
     requiresDateRange: string;
     requiresTimeRange: string;
@@ -26,13 +23,6 @@ export interface ApplicationTypesCopy {
     allowsAttachments: string;
   };
   allowedRoles: string;
-  customFieldTitle: string;
-  addCustomField: string;
-  fieldKey: string;
-  fieldLabelKa: string;
-  fieldLabelEn: string;
-  fieldType: string;
-  fieldRequired: string;
   flowTitle: string;
   addStep: string;
   slaTitle: string;
@@ -45,7 +35,6 @@ export interface ApplicationTypesCopy {
   noPermission: string;
   validationError: string;
   selectRole: string;
-  customFieldTypes: Record<CustomFieldType, string>;
   expireActions: Record<ApplicationStepSLA['onExpire'], string>;
 }
 
@@ -76,22 +65,13 @@ export const COPY: Record<'ka' | 'en', ApplicationTypesCopy> = {
     colorLabel: 'ფერი (Tailwind კლასი)',
     colorHint: 'მაგ: bg-sky-500, bg-emerald-500',
     fieldSettings: 'ველების კონფიგურაცია',
-    reasonLabel: 'მიზნის ველის სათაური',
-    commentLabel: 'კომენტარის ველის სათაური',
     toggles: {
       requiresDateRange: 'საჭიროა კალენდრის დიაპაზონი',
       requiresTimeRange: 'საჭიროა დროის დიაპაზონი',
       hasCommentField: 'დამატებითი კომენტარი',
-      allowsAttachments: 'ფაილების ატვირთვა დაშვებულია'
+      allowsAttachments: 'ფაილების ატვირთვა (50მბ-მდე)'
     },
     allowedRoles: 'ვინ შეუძლია განაცხადის შექმნა',
-    customFieldTitle: 'დამატებითი ველები',
-    addCustomField: 'ველი',
-    fieldKey: 'Key',
-    fieldLabelKa: 'სათაური (ქართ.)',
-    fieldLabelEn: 'სათაური (ინგლ.)',
-    fieldType: 'ტიპი',
-    fieldRequired: 'სავალდებულო',
     flowTitle: 'დამტკიცების მიმდევრობა',
     addStep: 'ნაბიჯის დამატება',
     slaTitle: 'SLA თითო ნაბიჯზე',
@@ -109,11 +89,6 @@ export const COPY: Record<'ka' | 'en', ApplicationTypesCopy> = {
     noPermission: 'თქვენ არ გაქვთ განაცხადების ტიპების მართვის უფლება.',
     validationError: 'გთხოვთ შეავსოთ სავალდებულო ველები და მიუთითოთ მინიმუმ ერთი ნაბიჯი.',
     selectRole: 'აირჩიეთ როლი…',
-    customFieldTypes: {
-      text: 'ტექსტი',
-      number: 'რიცხვი',
-      textarea: 'ტექსტური ბლოკი'
-    },
     expireActions: {
       AUTO_APPROVE: 'ავტომატური დამტკიცება',
       BOUNCE_BACK: 'დაბრუნება ავტორზე'
@@ -135,22 +110,13 @@ export const COPY: Record<'ka' | 'en', ApplicationTypesCopy> = {
     colorLabel: 'Color (Tailwind class)',
     colorHint: 'e.g. bg-sky-500, bg-emerald-500',
     fieldSettings: 'Field configuration',
-    reasonLabel: 'Purpose field label',
-    commentLabel: 'Comment field label',
     toggles: {
       requiresDateRange: 'Require calendar range',
       requiresTimeRange: 'Require time range',
       hasCommentField: 'Include comment box',
-      allowsAttachments: 'Allow attachments'
+      allowsAttachments: 'Allow attachments (up to 50MB)'
     },
     allowedRoles: 'Who can submit this request',
-    customFieldTitle: 'Additional fields',
-    addCustomField: 'Add field',
-    fieldKey: 'Field key',
-    fieldLabelKa: 'Label (Georgian)',
-    fieldLabelEn: 'Label (English)',
-    fieldType: 'Type',
-    fieldRequired: 'Required',
     flowTitle: 'Approval flow',
     addStep: 'Add step',
     slaTitle: 'SLA per step',
@@ -168,11 +134,6 @@ export const COPY: Record<'ka' | 'en', ApplicationTypesCopy> = {
     noPermission: 'You do not have permission to manage request types.',
     validationError: 'Please fill in required fields and configure at least one approval step.',
     selectRole: 'Select role…',
-    customFieldTypes: {
-      text: 'Text',
-      number: 'Number',
-      textarea: 'Textarea'
-    },
     expireActions: {
       AUTO_APPROVE: 'Auto approve',
       BOUNCE_BACK: 'Return to requester'

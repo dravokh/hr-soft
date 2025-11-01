@@ -88,7 +88,7 @@ const COPY: Record<
     title: string;
     subtitle: string;
     create: string;
-    tabs: { all: string; pending: string; sent: string };
+    tabs: { all: string; pending: string; sent: string; returned: string };
     table: { number: string; type: string; requester: string; status: string; updated: string; action: string; empty: string };
     modal: {
       details: string;
@@ -129,7 +129,7 @@ const COPY: Record<
     title: 'განაცხადები',
     subtitle: 'დააკვირდით დამტკიცების პროცესს, გააზიარეთ კომენტარები და მართეთ ავტომატური შეტყობინებები.',
     create: '+ ახალი განაცხადი',
-    tabs: { all: 'ყველა', pending: 'მოლოდინში', sent: 'ჩემი გაგზავნილები' },
+    tabs: { all: 'ყველა', pending: 'მოლოდინში', sent: 'ჩემი გაგზავნილები', returned: 'უკან დაბრუნებული' },
     table: {
       number: '#',
       type: 'ტიპი',
@@ -177,7 +177,7 @@ const COPY: Record<
     title: 'Applications',
     subtitle: 'Track approval workflows, share comments, and manage automated notifications.',
     create: '+ New application',
-    tabs: { all: 'All', pending: 'Pending', sent: 'Sent' },
+    tabs: { all: 'All', pending: 'Pending', sent: 'Sent', returned: 'Returned' },
     table: {
       number: '#',
       type: 'Type',
@@ -300,7 +300,7 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     addApplicationAttachment
   } = useAppContext();
 
-  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'sent'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'sent' | 'returned'>('all');
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(applicationTypes[0]?.id ?? null);
   const [createValues, setCreateValues] = useState<Record<string, string>>({});
@@ -392,18 +392,30 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     return accessibleApplications.filter((bundle) => bundle.application.requesterId === currentUser.id);
   }, [accessibleApplications, currentUser]);
 
+  const returnedApplications = useMemo(() => {
+    return accessibleApplications.filter((bundle) => {
+      if (bundle.application.status === 'REJECTED' || bundle.application.currentStepIndex < 0) {
+        return true;
+      }
+      const lastEntry = bundle.auditTrail[bundle.auditTrail.length - 1];
+      return lastEntry?.action === 'REJECT' || lastEntry?.action === 'EXPIRE_BOUNCE';
+    });
+  }, [accessibleApplications]);
+
   const filteredApplications = useMemo(() => {
     const source =
       activeTab === 'pending'
         ? pendingApplications
         : activeTab === 'sent'
         ? sentApplications
+        : activeTab === 'returned'
+        ? returnedApplications
         : accessibleApplications;
 
     return [...source].sort(
       (a, b) => new Date(b.application.updatedAt).getTime() - new Date(a.application.updatedAt).getTime()
     );
-  }, [activeTab, accessibleApplications, pendingApplications, sentApplications]);
+  }, [activeTab, accessibleApplications, pendingApplications, returnedApplications, sentApplications]);
 
   const selectedType = selectedTypeId ? typeById.get(selectedTypeId) ?? null : null;
 
@@ -1427,12 +1439,14 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          {(['all', 'pending', 'sent'] as const).map((tab) => {
+          {(['all', 'pending', 'sent', 'returned'] as const).map((tab) => {
             const count =
               tab === 'pending'
                 ? pendingApplications.length
                 : tab === 'sent'
                 ? sentApplications.length
+                : tab === 'returned'
+                ? returnedApplications.length
                 : accessibleApplications.length;
             return (
               <button

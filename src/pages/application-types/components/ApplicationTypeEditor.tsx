@@ -1,9 +1,8 @@
 import React from 'react';
-import { Clock3, Layers3, PlusCircle, Save, ShieldCheck, Trash2, PencilLine } from 'lucide-react';
+import { Clock3, Layers3, PlusCircle, Save, ShieldCheck, PencilLine, Trash2 } from 'lucide-react';
 import type { Role } from '../../../types';
 import type {
   ApplicationType,
-  CustomFieldForm,
   FormState,
   Mode,
   SlaFormEntry
@@ -24,9 +23,6 @@ interface ApplicationTypeEditorProps {
   allowedRolesDropdownRef: React.MutableRefObject<HTMLDivElement | null>;
   onToggleAllowedRoles: () => void;
   onClearAllowedRoles: () => void;
-  onAddCustomField: () => void;
-  onRemoveCustomField: (index: number) => void;
-  onCustomFieldChange: (index: number, updates: Partial<CustomFieldForm>) => void;
   onFlowRoleChange: (index: number, roleId: number) => void;
   onAddFlowStep: () => void;
   onRemoveFlowStep: (index: number) => void;
@@ -53,9 +49,6 @@ export const ApplicationTypeEditor: React.FC<ApplicationTypeEditorProps> = ({
   allowedRolesDropdownRef,
   onToggleAllowedRoles,
   onClearAllowedRoles,
-  onAddCustomField,
-  onRemoveCustomField,
-  onCustomFieldChange,
   onFlowRoleChange,
   onAddFlowStep,
   onRemoveFlowStep,
@@ -171,38 +164,6 @@ export const ApplicationTypeEditor: React.FC<ApplicationTypeEditorProps> = ({
 
       <section className="space-y-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{copy.fieldSettings}</h3>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-slate-700">{copy.reasonLabel}</label>
-            <input
-              value={formState.reasonLabelKa}
-              onChange={(event) => onFormChange((prev) => ({ ...prev, reasonLabelKa: event.target.value }))}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="ქართული"
-            />
-            <input
-              value={formState.reasonLabelEn}
-              onChange={(event) => onFormChange((prev) => ({ ...prev, reasonLabelEn: event.target.value }))}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="English"
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-slate-700">{copy.commentLabel}</label>
-            <input
-              value={formState.commentLabelKa}
-              onChange={(event) => onFormChange((prev) => ({ ...prev, commentLabelKa: event.target.value }))}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="ქართული"
-            />
-            <input
-              value={formState.commentLabelEn}
-              onChange={(event) => onFormChange((prev) => ({ ...prev, commentLabelEn: event.target.value }))}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="English"
-            />
-          </div>
-        </div>
         <div className="grid gap-3 md:grid-cols-2">
           {Object.entries(formState.capabilities).map(([key, value]) => (
             <label
@@ -317,88 +278,6 @@ export const ApplicationTypeEditor: React.FC<ApplicationTypeEditorProps> = ({
         ) : (
           <p className="text-xs text-slate-500">{copy.selectRole}</p>
         )}
-      </section>
-
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{copy.customFieldTitle}</h3>
-          <button
-            type="button"
-            onClick={onAddCustomField}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-          >
-            <PlusCircle className="h-3.5 w-3.5" />
-            {copy.addCustomField}
-          </button>
-        </div>
-        <div className="space-y-4">
-          {formState.customFields.map((field, index) => (
-            <div key={index} className="rounded-2xl border border-slate-200 p-4">
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div className="grid flex-1 gap-3 md:grid-cols-2">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-semibold uppercase text-slate-500">{copy.fieldKey}</label>
-                    <input
-                      value={field.key}
-                      onChange={(event) => onCustomFieldChange(index, { key: event.target.value })}
-                      className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-semibold uppercase text-slate-500">{copy.fieldType}</label>
-                    <select
-                      value={field.type}
-                      onChange={(event) =>
-                        onCustomFieldChange(index, { type: event.target.value as CustomFieldForm['type'] })
-                      }
-                      className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      {(Object.keys(copy.customFieldTypes) as Array<CustomFieldForm['type']>).map((option) => (
-                        <option key={option} value={option}>
-                          {copy.customFieldTypes[option]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onRemoveCustomField(index)}
-                  className="mt-2 inline-flex items-center gap-2 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 md:mt-0"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              <div className="grid gap-3 pt-4 md:grid-cols-2">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold uppercase text-slate-500">{copy.fieldLabelKa}</label>
-                  <input
-                    value={field.labelKa}
-                    onChange={(event) => onCustomFieldChange(index, { labelKa: event.target.value })}
-                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold uppercase text-slate-500">{copy.fieldLabelEn}</label>
-                  <input
-                    value={field.labelEn}
-                    onChange={(event) => onCustomFieldChange(index, { labelEn: event.target.value })}
-                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-              <label className="mt-3 inline-flex items-center gap-2 text-xs font-semibold uppercase text-slate-500">
-                <input
-                  type="checkbox"
-                  checked={field.required}
-                  onChange={(event) => onCustomFieldChange(index, { required: event.target.checked })}
-                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                {copy.fieldRequired}
-              </label>
-            </div>
-          ))}
-        </div>
       </section>
 
       <section className="space-y-3">

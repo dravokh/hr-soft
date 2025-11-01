@@ -6,17 +6,6 @@ import type {
 } from '../../types';
 
 export type Mode = 'view' | 'edit' | 'create';
-
-export type CustomFieldType = 'text' | 'number' | 'textarea';
-
-export interface CustomFieldForm {
-  key: string;
-  labelKa: string;
-  labelEn: string;
-  type: CustomFieldType;
-  required: boolean;
-}
-
 export interface SlaFormEntry {
   stepIndex: number;
   hours: number;
@@ -34,11 +23,6 @@ export interface FormState {
   flow: number[];
   sla: SlaFormEntry[];
   allowedRoleIds: number[];
-  reasonLabelKa: string;
-  reasonLabelEn: string;
-  commentLabelKa: string;
-  commentLabelEn: string;
-  customFields: CustomFieldForm[];
 }
 
 export type {

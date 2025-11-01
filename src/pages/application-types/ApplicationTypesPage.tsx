@@ -9,7 +9,7 @@ import {
   syncSlaWithFlow,
   validateForm
 } from './helpers';
-import type { ApplicationType, CustomFieldForm, FormState, Mode, SlaFormEntry } from './types';
+import type { ApplicationType, FormState, Mode, SlaFormEntry } from './types';
 import { ApplicationTypeEditor } from './components/ApplicationTypeEditor';
 import { ApplicationTypeList } from './components/ApplicationTypeList';
 import { NoPermissionCallout } from './components/NoPermissionCallout';
@@ -201,42 +201,12 @@ export const ApplicationTypesPage: React.FC<ApplicationTypesPageProps> = ({ lang
     });
   };
 
-  const handleCustomFieldChange = (index: number, updates: Partial<CustomFieldForm>) => {
-    setFormState((previous) => {
-      const next = previous.customFields.map((field, idx) => (idx === index ? { ...field, ...updates } : field));
-      return { ...previous, customFields: next };
-    });
-  };
-
-  const addCustomField = () => {
-    setFormState((previous) => ({
-      ...previous,
-      customFields: [
-        ...previous.customFields,
-        {
-          key: `field_${previous.customFields.length + 1}`,
-          labelKa: '',
-          labelEn: '',
-          type: 'text',
-          required: false
-        }
-      ]
-    }));
-  };
-
-  const removeCustomField = (index: number) => {
-    setFormState((previous) => ({
-      ...previous,
-      customFields: previous.customFields.filter((_, idx) => idx !== index)
-    }));
-  };
-
-  const buildPayload = (): Omit<ApplicationType, 'id'> => ({
+  const buildPayload = (existing?: ApplicationType): Omit<ApplicationType, 'id'> => ({
     name: { ka: formState.nameKa.trim(), en: formState.nameEn.trim() },
     description: { ka: formState.descriptionKa.trim(), en: formState.descriptionEn.trim() },
     icon: formState.icon.trim() || 'Layers3',
     color: formState.color.trim() || 'bg-slate-500',
-    fields: buildFields(formState),
+    fields: buildFields(formState, existing),
     flow: formState.flow.filter((roleId, index, array) => roleId && array.indexOf(roleId) === index),
     slaPerStep: formState.sla.map((entry) => ({
       stepIndex: entry.stepIndex,
@@ -264,8 +234,12 @@ export const ApplicationTypesPage: React.FC<ApplicationTypesPageProps> = ({ lang
         setMode('view');
         setSelectedTypeId(created.id);
         setAllowedRolesOpen(false);
+        setFormState(buildFormStateFromType(created));
       } else if (selectedType) {
-        await updateApplicationType({ id: selectedType.id, ...buildPayload() });
+        const updated = await updateApplicationType({ id: selectedType.id, ...buildPayload(selectedType) });
+        if (updated) {
+          setFormState(buildFormStateFromType(updated));
+        }
         setStatusMessage(t.successUpdated);
         setMode('view');
         setAllowedRolesOpen(false);
@@ -344,9 +318,6 @@ export const ApplicationTypesPage: React.FC<ApplicationTypesPageProps> = ({ lang
           allowedRolesDropdownRef={allowedRolesDropdownRef}
           onToggleAllowedRoles={() => setAllowedRolesOpen((previous) => !previous)}
           onClearAllowedRoles={() => setFormState((prev) => ({ ...prev, allowedRoleIds: [] }))}
-          onAddCustomField={addCustomField}
-          onRemoveCustomField={removeCustomField}
-          onCustomFieldChange={handleCustomFieldChange}
           onFlowRoleChange={handleFlowRoleChange}
           onAddFlowStep={handleAddFlowStep}
           onRemoveFlowStep={handleRemoveFlowStep}

@@ -1,31 +1,15 @@
 import React from 'react';
-import {
-  CalendarDays,
-  CheckCircle2,
-  ClipboardList,
-  Clock3,
-  Layers3
-} from 'lucide-react';
+import { CalendarDays, Clock3, Layers3, Plane } from 'lucide-react';
 import type { ApplicationFieldDefinition, ApplicationType } from '../../types';
-import type { CustomFieldForm, FormState, SlaFormEntry, CustomFieldType } from './types';
+import type { FormState, SlaFormEntry } from './types';
 import { DEFAULT_COMMENT_PLACEHOLDER, DEFAULT_REASON_PLACEHOLDER } from './copy';
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   CalendarDays,
   Clock3,
-  ClipboardList,
   Layers3,
-  CheckCircle2
+  Plane
 };
-
-const KNOWN_FIELD_KEYS = new Set([
-  'reason',
-  'start_date',
-  'end_date',
-  'start_time',
-  'end_time',
-  'additional_comment'
-]);
 
 export const syncSlaWithFlow = (flow: number[], current: SlaFormEntry[]): SlaFormEntry[] => {
   const existing = new Map(current.map((entry) => [entry.stepIndex, entry] as const));
@@ -46,18 +30,6 @@ export const getIconComponent = (iconName: string) => {
   return Component ?? Layers3;
 };
 
-export const extractCustomFields = (fields: ApplicationFieldDefinition[]): CustomFieldForm[] => {
-  return fields
-    .filter((field) => !KNOWN_FIELD_KEYS.has(field.key))
-    .map((field) => ({
-      key: field.key,
-      labelKa: field.label.ka,
-      labelEn: field.label.en,
-      type: (field.type as CustomFieldType) ?? 'text',
-      required: Boolean(field.required)
-    }));
-};
-
 export const buildDefaultFormState = (): FormState => ({
   nameKa: '',
   nameEn: '',
@@ -73,17 +45,10 @@ export const buildDefaultFormState = (): FormState => ({
   },
   flow: [],
   sla: [],
-  allowedRoleIds: [],
-  reasonLabelKa: 'განაცხადის მიზანი',
-  reasonLabelEn: 'Purpose',
-  commentLabelKa: 'დამატებითი კომენტარი',
-  commentLabelEn: 'Additional comment',
-  customFields: []
+  allowedRoleIds: []
 });
 
 export const buildFormStateFromType = (type: ApplicationType): FormState => {
-  const reasonField = type.fields.find((field) => field.key === 'reason');
-  const commentField = type.fields.find((field) => field.key === 'additional_comment');
   const form: FormState = {
     nameKa: type.name.ka,
     nameEn: type.name.en,
@@ -98,22 +63,28 @@ export const buildFormStateFromType = (type: ApplicationType): FormState => {
       hours: Math.max(1, Math.round(entry.seconds / 3600)),
       onExpire: entry.onExpire
     })),
-    allowedRoleIds: [...type.allowedRoleIds],
-    reasonLabelKa: reasonField?.label.ka ?? 'განაცხადის მიზანი',
-    reasonLabelEn: reasonField?.label.en ?? 'Purpose',
-    commentLabelKa: commentField?.label.ka ?? 'დამატებითი კომენტარი',
-    commentLabelEn: commentField?.label.en ?? 'Additional comment',
-    customFields: extractCustomFields(type.fields)
+    allowedRoleIds: [...type.allowedRoleIds]
   };
   form.sla = syncSlaWithFlow(form.flow, form.sla);
   return form;
 };
 
-export const buildFields = (form: FormState): ApplicationFieldDefinition[] => {
+const findFieldLabel = (type: ApplicationType | undefined, key: string, fallback: { ka: string; en: string }) => {
+  if (!type) {
+    return fallback;
+  }
+  const field = type.fields.find((candidate) => candidate.key === key);
+  return field ? field.label : fallback;
+};
+
+export const buildFields = (
+  form: FormState,
+  existing?: ApplicationType
+): ApplicationFieldDefinition[] => {
   const fields: ApplicationFieldDefinition[] = [
     {
       key: 'reason',
-      label: { ka: form.reasonLabelKa || 'განაცხადის მიზანი', en: form.reasonLabelEn || 'Purpose' },
+      label: findFieldLabel(existing, 'reason', { ka: 'განაცხადის მიზანი', en: 'Purpose' }),
       type: 'textarea',
       required: true,
       placeholder: DEFAULT_REASON_PLACEHOLDER
@@ -153,21 +124,15 @@ export const buildFields = (form: FormState): ApplicationFieldDefinition[] => {
   if (form.capabilities.hasCommentField) {
     fields.push({
       key: 'additional_comment',
-      label: { ka: form.commentLabelKa || 'დამატებითი კომენტარი', en: form.commentLabelEn || 'Additional comment' },
+      label: findFieldLabel(existing, 'additional_comment', {
+        ka: 'დამატებითი კომენტარი',
+        en: 'Additional comment'
+      }),
       type: 'textarea',
       required: false,
       placeholder: DEFAULT_COMMENT_PLACEHOLDER
     });
   }
-
-  form.customFields.forEach((field) => {
-    fields.push({
-      key: field.key,
-      label: { ka: field.labelKa, en: field.labelEn },
-      type: field.type,
-      required: field.required
-    } as ApplicationFieldDefinition);
-  });
 
   return fields;
 };
@@ -180,26 +145,6 @@ export const validateForm = (form: FormState): boolean => {
     return false;
   }
   if (!form.flow.length) {
-    return false;
-  }
-  if (form.customFields.some((field) => !field.key.trim() || !field.labelKa.trim() || !field.labelEn.trim())) {
-    return false;
-  }
-  const builtInKeys: string[] = ['reason'];
-  if (form.capabilities.requiresDateRange) {
-    builtInKeys.push('start_date', 'end_date');
-  }
-  if (form.capabilities.requiresTimeRange) {
-    builtInKeys.push('start_time', 'end_time');
-  }
-  if (form.capabilities.hasCommentField) {
-    builtInKeys.push('additional_comment');
-  }
-
-  const customKeys = form.customFields.map((field) => field.key.trim());
-  const allKeys = [...builtInKeys, ...customKeys].filter(Boolean);
-  const uniqueKeys = new Set(allKeys);
-  if (uniqueKeys.size !== allKeys.length) {
     return false;
   }
   return true;
