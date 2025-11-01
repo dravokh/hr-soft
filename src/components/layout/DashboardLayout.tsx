@@ -17,7 +17,7 @@ import { UsersPage } from '../../pages/UsersPage';
 import { PermissionsPage } from '../../pages/PermissionsPage';
 import { TicketsPage } from '../../pages/TicketsPage';
 import { ApplicationsPage } from '../../pages/ApplicationsPage';
-import { ApplicationTypesPage } from '../../pages/ApplicationTypesPage';
+import { ApplicationTypesPage } from '../../pages/application-types';
 import { MainLayout, MenuItem } from './MainLayout';
 
 const MENU_DEFINITIONS: MenuItem[] = [
