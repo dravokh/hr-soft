@@ -55,6 +55,8 @@ hr-soft/
 │   ├── App.tsx
 │   ├── index.css
 │   └── main.tsx
+├── database/
+│   └── hr_soft.sql
 ├── index.html
 ├── package.json
 ├── postcss.config.cjs
@@ -65,6 +67,19 @@ hr-soft/
 ```
 
 ## Exporting or Uploading the Project
+
+## Database Seed
+
+An SQL dump that mirrors the in-app seed data is available at
+`database/hr_soft.sql`. Import it with phpMyAdmin or the MySQL CLI:
+
+```sql
+SOURCE /path/to/database/hr_soft.sql;
+```
+
+The script creates the `hr_soft` schema, tables for roles, permissions,
+role assignments, users (with phone numbers), and an empty sessions table, then
+populates it with the same demo records used by the React app.
 
 ### Option 1 – Download everything as a single archive
 
