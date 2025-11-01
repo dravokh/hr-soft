@@ -6,7 +6,8 @@ Key modules include:
 
 - **Ticket desk:** capture employee requests, track progress, and resolve blockers from a centralized workflow.
 - **User management:** onboard new teammates with role assignments and phone details.
-- **Role-based access:** demonstrate granular permissions across HR, Admin, and Employee personas.
+- **Role & permission management:** build bespoke roles, assign granular permissions, and audit access from a single matrix.
+- **Employee profile:** let teammates update their contact details and rotate passwords without leaving the dashboard.
 
 ## Getting Started
 

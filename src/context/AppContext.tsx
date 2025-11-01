@@ -190,6 +190,13 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
   const saveUsers = useCallback(async (newUsers: User[]): Promise<void> => {
     setUsers(newUsers);
     storage.set(STORAGE_KEYS.USERS, newUsers);
+    setCurrentUser((previous) => {
+      if (!previous) {
+        return previous;
+      }
+
+      return newUsers.find((user) => user.id === previous.id) ?? previous;
+    });
   }, []);
 
   const saveTickets = useCallback(async (newTickets: Ticket[]): Promise<void> => {
