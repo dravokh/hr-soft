@@ -43,7 +43,8 @@ const DEFAULT_ROLES: Role[] = [
       'approve_requests',
       'view_tickets',
       'update_tickets',
-      'set_ticket_priority'
+      'set_ticket_priority',
+      'manage_request_types'
     ]
   },
   {
@@ -448,8 +449,11 @@ const ensureAdminPermissions = (roles: Role[]): Role[] => {
       permissions = ALL_PERMISSIONS.map((permission) => permission.id);
     }
 
-    if (role.id === 2 && !permissions.includes('set_ticket_priority')) {
-      permissions = [...permissions, 'set_ticket_priority'];
+    if (role.id === 2) {
+      const enriched = new Set(permissions);
+      enriched.add('set_ticket_priority');
+      enriched.add('manage_request_types');
+      permissions = Array.from(enriched);
     }
 
     return {
@@ -469,6 +473,7 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const applicationTypeIdRef = useRef(1);
   const applicationIdRef = useRef(1);
   const attachmentIdRef = useRef(1);
   const auditIdRef = useRef(1);
@@ -932,15 +937,80 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
     [applicationTypes, applyApprove, applyReject]
   );
 
-  const saveApplications = useCallback(
-    async (nextBundles: ApplicationBundle[]): Promise<void> => {
-      const normalized = normalizeApplications(nextBundles, applicationTypes);
-      const processed = runSlaAutomation(normalized);
-      setApplications(processed);
+  const recomputeApplications = useCallback(
+    (bundles: ApplicationBundle[], types: ApplicationType[]): ApplicationBundle[] => {
+      const normalized = normalizeApplications(bundles, types);
+      const processed = runSlaAutomation(normalized, types);
       storage.set(STORAGE_KEYS.APPLICATIONS, processed);
       syncCounters(processed);
+      return processed;
     },
-    [applicationTypes, runSlaAutomation, syncCounters]
+    [runSlaAutomation, syncCounters]
+  );
+
+  const saveApplications = useCallback(
+    async (nextBundles: ApplicationBundle[]): Promise<void> => {
+      const processed = recomputeApplications(nextBundles, applicationTypes);
+      setApplications(processed);
+    },
+    [applicationTypes, recomputeApplications]
+  );
+
+  const saveApplicationTypes = useCallback(
+    async (
+      nextTypes: ApplicationType[],
+      applicationUpdater?: (current: ApplicationBundle[]) => ApplicationBundle[]
+    ): Promise<void> => {
+      applicationTypeIdRef.current =
+        nextTypes.reduce((max, type) => Math.max(max, type.id), 0) + 1;
+      setApplicationTypes(nextTypes);
+      storage.set(STORAGE_KEYS.APPLICATION_TYPES, nextTypes);
+      setApplications((prev) => {
+        const base = applicationUpdater ? applicationUpdater(prev) : prev;
+        return recomputeApplications(base, nextTypes);
+      });
+    },
+    [applicationTypeIdRef, recomputeApplications]
+  );
+
+  const createApplicationType = useCallback(
+    async (payload: Omit<ApplicationType, 'id'>): Promise<ApplicationType> => {
+      const typeId = applicationTypeIdRef.current++;
+      const newType: ApplicationType = { id: typeId, ...payload };
+      const nextTypes = [...applicationTypes, newType];
+      await saveApplicationTypes(nextTypes);
+      return newType;
+    },
+    [applicationTypes, saveApplicationTypes]
+  );
+
+  const updateApplicationType = useCallback(
+    async (payload: ApplicationType): Promise<ApplicationType | null> => {
+      const index = applicationTypes.findIndex((type) => type.id === payload.id);
+      if (index === -1) {
+        return null;
+      }
+
+      const nextTypes = applicationTypes.map((type) => (type.id === payload.id ? payload : type));
+      await saveApplicationTypes(nextTypes);
+      return payload;
+    },
+    [applicationTypes, saveApplicationTypes]
+  );
+
+  const deleteApplicationType = useCallback(
+    async (typeId: number): Promise<boolean> => {
+      if (!applicationTypes.some((type) => type.id === typeId)) {
+        return false;
+      }
+
+      const nextTypes = applicationTypes.filter((type) => type.id !== typeId);
+      await saveApplicationTypes(nextTypes, (current) =>
+        current.filter((bundle) => bundle.application.typeId !== typeId)
+      );
+      return true;
+    },
+    [applicationTypes, saveApplicationTypes]
   );
 
   const loadAllData = useCallback(async () => {
@@ -966,6 +1036,8 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
 
       const storedTypes = storage.get<ApplicationType[]>(STORAGE_KEYS.APPLICATION_TYPES);
       const resolvedTypes = storedTypes ?? DEFAULT_APPLICATION_TYPES;
+      applicationTypeIdRef.current =
+        resolvedTypes.reduce((max, type) => Math.max(max, type.id), 0) + 1;
       setApplicationTypes(resolvedTypes);
       storage.set(STORAGE_KEYS.APPLICATION_TYPES, resolvedTypes);
 
@@ -988,7 +1060,7 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
     } finally {
       setLoading(false);
     }
-  }, [runSlaAutomation, syncCounters]);
+  }, [applicationTypeIdRef, runSlaAutomation, syncCounters]);
 
   useEffect(() => {
     void loadAllData();
@@ -1341,7 +1413,11 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
       saveRoles,
       saveUsers,
       saveTickets,
+      saveApplicationTypes,
       saveApplications,
+      createApplicationType,
+      updateApplicationType,
+      deleteApplicationType,
       createApplication,
       submitApplication,
       approveApplication,
@@ -1368,7 +1444,11 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
       saveRoles,
       saveUsers,
       saveTickets,
+      saveApplicationTypes,
       saveApplications,
+      createApplicationType,
+      updateApplicationType,
+      deleteApplicationType,
       createApplication,
       submitApplication,
       approveApplication,
