@@ -25,6 +25,17 @@ const COPY: Record<ProfilePageProps['language'], {
   passwordMismatch: string;
   passwordWrong: string;
   required: string;
+  overviewTitle: string;
+  overviewSubtitle: string;
+  roleHeading: string;
+  permissionsHeading: string;
+  permissionsHelper: string;
+  permissionsEmpty: string;
+  roleSummaryTitle: string;
+  roleSummarySubtitle: string;
+  membersLabel: (count: number) => string;
+  systemBadge: string;
+  customBadge: string;
 }> = {
   ka: {
     heading: 'ჩემი პროფილი',
@@ -45,7 +56,22 @@ const COPY: Record<ProfilePageProps['language'], {
     passwordUpdated: 'პაროლი წარმატებით შეიცვალა.',
     passwordMismatch: 'ახალი პაროლი და განმეორება არ ემთხვევა.',
     passwordWrong: 'მოქმედი პაროლი არასწორია.',
-    required: 'გთხოვთ, შეავსოთ ყველა ველი.'
+    required: 'გთხოვთ, შეავსოთ ყველა ველი.',
+    overviewTitle: 'ჩემი დეტალები',
+    overviewSubtitle: 'დაადასტურეთ რომ საკონტაქტო ინფორმაცია და როლის აღწერა არის განახლებული.',
+    roleHeading: 'ჩემი როლი',
+    permissionsHeading: 'ჩემი უფლებები',
+    permissionsHelper: 'უფლება აქტიურია თუ ის მოცემულია ქვემოთ მწვანე ბეჯით. ცვლილებები ძალაში შედის მაშინვე.',
+    permissionsEmpty: 'ამ როლს ჯერ არ აქვს მინიჭებული უფლებები.',
+    roleSummaryTitle: 'როლის მიმოხილვა',
+    roleSummarySubtitle: 'იხილეთ როლის აღწერა და რამდენი კოლეგა იყენებს ამავე წვდომებს.',
+    membersLabel: (count: number) => {
+      if (count === 0) return '0 მომხმარებელი';
+      if (count === 1) return '1 მომხმარებელი';
+      return `${count} მომხმარებელი`;
+    },
+    systemBadge: 'სისტემური როლი',
+    customBadge: 'მორგებული როლი'
   },
   en: {
     heading: 'My profile',

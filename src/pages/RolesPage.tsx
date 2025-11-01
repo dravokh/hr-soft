@@ -46,6 +46,10 @@ const COPY: Record<RolesPageProps['language'], {
   adminNotice: string;
   noAccess: string;
   permissionHint: string;
+  membersLabel: (count: number) => string;
+  permissionCount: (count: number) => string;
+  systemBadge: string;
+  customBadge: string;
 }> = {
   ka: {
     title: 'როლების მართვა',
