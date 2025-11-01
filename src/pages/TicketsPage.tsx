@@ -1,4 +1,4 @@
-import React, { FormEvent, useMemo, useState } from 'react';
+import React, { FormEvent, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle2, Clock3, PlusCircle } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Ticket, TicketPriority, TicketStatus } from '../types';
@@ -27,6 +27,7 @@ const COPY: Record<TicketsPageProps['language'], {
   assignedTo: string;
   updated: string;
   status: string;
+  priorityInfo: string;
 }> = {
   ka: {
     title: 'მოთხოვნების თიკეტები',
@@ -51,7 +52,8 @@ const COPY: Record<TicketsPageProps['language'], {
     createdBy: 'შემქმნელი',
     assignedTo: 'მექალმე',
     updated: 'განახლდა',
-    status: 'სტატუსი'
+    status: 'სტატუსი',
+    priorityInfo: 'პრიორიტეტის შეცვლა შესაძლებელია მხოლოდ შესაბამისი ნებართვის მქონე მომხმარებლებისთვის.'
   },
   en: {
     title: 'Service Tickets',
@@ -76,7 +78,8 @@ const COPY: Record<TicketsPageProps['language'], {
     createdBy: 'Created by',
     assignedTo: 'Assigned to',
     updated: 'Updated',
-    status: 'Status'
+    status: 'Status',
+    priorityInfo: 'Only roles with permission can adjust ticket priority.'
   }
 };
 
@@ -119,6 +122,13 @@ export const TicketsPage: React.FC<TicketsPageProps> = ({ language }) => {
   const t = COPY[language];
   const canCreate = hasPermission('create_tickets') && Boolean(currentUser);
   const canUpdate = hasPermission('update_tickets');
+  const canSetPriority = hasPermission('set_ticket_priority');
+
+  useEffect(() => {
+    if (!canSetPriority && formData.priority !== 'medium') {
+      setFormData((previous) => ({ ...previous, priority: 'medium' }));
+    }
+  }, [canSetPriority, formData.priority]);
 
   const statusCounts = useMemo(() => {
     return tickets.reduce(
@@ -157,7 +167,7 @@ export const TicketsPage: React.FC<TicketsPageProps> = ({ language }) => {
 
     const title = formData.title.trim();
     const description = formData.description.trim();
-    const priority = formData.priority as TicketPriority;
+    const priority = (canSetPriority ? formData.priority : 'medium') as TicketPriority;
 
     if (!title || !description) {
       setError(t.required);
@@ -283,7 +293,8 @@ export const TicketsPage: React.FC<TicketsPageProps> = ({ language }) => {
                   name="priority"
                   value={formData.priority}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-200 px-4 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={!canSetPriority}
+                  className="rounded-lg border border-slate-200 px-4 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                 >
                   {(Object.keys(PRIORITY_LABELS) as TicketPriority[]).map((priority) => (
                     <option key={priority} value={priority}>
@@ -291,6 +302,9 @@ export const TicketsPage: React.FC<TicketsPageProps> = ({ language }) => {
                     </option>
                   ))}
                 </select>
+                {!canSetPriority ? (
+                  <p className="mt-2 text-xs text-slate-500">{t.priorityInfo}</p>
+                ) : null}
               </div>
             </div>
 

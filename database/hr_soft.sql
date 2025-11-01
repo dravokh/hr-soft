@@ -56,6 +56,7 @@ INSERT INTO `permissions` (`id`, `name`, `category`) VALUES
   ('view_tickets', 'სერვის თიკეტების ნახვა', 'Tickets'),
   ('create_tickets', 'სერვის თიკეტების შექმნა', 'Tickets'),
   ('update_tickets', 'სერვის თიკეტების განახლება', 'Tickets'),
+  ('set_ticket_priority', 'თიკეტების პრიორიტეტების მართვა', 'Tickets'),
   ('manage_permissions', 'უფლებების მართვა', 'System');
 
 -- Junction table linking roles to their permissions
@@ -82,7 +83,8 @@ INSERT INTO `role_permissions` (`role_id`, `permission_id`) VALUES
   (2, 'view_requests'),
   (2, 'approve_requests'),
   (2, 'view_tickets'),
-  (2, 'update_tickets');
+  (2, 'update_tickets'),
+  (2, 'set_ticket_priority');
 
 -- Employee role permissions
 INSERT INTO `role_permissions` (`role_id`, `permission_id`) VALUES

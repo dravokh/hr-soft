@@ -21,7 +21,15 @@ const DEFAULT_ROLES: Role[] = [
     id: 2,
     name: 'HR',
     description: 'HR მენეჯერი',
-    permissions: ['view_dashboard', 'view_users', 'view_requests', 'approve_requests', 'view_tickets', 'update_tickets']
+    permissions: [
+      'view_dashboard',
+      'view_users',
+      'view_requests',
+      'approve_requests',
+      'view_tickets',
+      'update_tickets',
+      'set_ticket_priority'
+    ]
   },
   {
     id: 3,
@@ -103,13 +111,20 @@ const AppContext = createContext<AppContextValue | undefined>(undefined);
 
 const ensureAdminPermissions = (roles: Role[]): Role[] => {
   return roles.map((role) => {
+    let permissions = role.permissions;
+
     if (role.id === 1) {
-      return {
-        ...role,
-        permissions: ALL_PERMISSIONS.map((permission) => permission.id)
-      };
+      permissions = ALL_PERMISSIONS.map((permission) => permission.id);
     }
-    return role;
+
+    if (role.id === 2 && !permissions.includes('set_ticket_priority')) {
+      permissions = [...permissions, 'set_ticket_priority'];
+    }
+
+    return {
+      ...role,
+      permissions: Array.from(new Set(permissions))
+    };
   });
 };
 

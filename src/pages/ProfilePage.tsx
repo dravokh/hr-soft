@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { ShieldCheck, Users as UsersIcon } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import { ALL_PERMISSIONS, PERMISSION_CATEGORY_LABELS, PERMISSION_LABELS } from '../constants/permissions';
 
 interface ProfilePageProps {
   language: 'ka' | 'en';
@@ -92,12 +94,27 @@ const COPY: Record<ProfilePageProps['language'], {
     passwordUpdated: 'Password updated successfully.',
     passwordMismatch: 'New password and confirmation do not match.',
     passwordWrong: 'The current password is incorrect.',
-    required: 'Please complete every field.'
+    required: 'Please complete every field.',
+    overviewTitle: 'My details',
+    overviewSubtitle: 'Ensure your contact information and role description are always up to date.',
+    roleHeading: 'My role',
+    permissionsHeading: 'My permissions',
+    permissionsHelper: 'Active permissions are highlighted below. Updates apply instantly to your session.',
+    permissionsEmpty: 'No permissions have been granted to this role yet.',
+    roleSummaryTitle: 'Role overview',
+    roleSummarySubtitle: 'Review the role description and see how many teammates share this access.',
+    membersLabel: (count: number) => {
+      if (count === 0) return '0 members';
+      if (count === 1) return '1 member';
+      return `${count} members`;
+    },
+    systemBadge: 'System role',
+    customBadge: 'Custom role'
   }
 };
 
 export const ProfilePage: React.FC<ProfilePageProps> = ({ language }) => {
-  const { currentUser, users, saveUsers } = useAppContext();
+  const { currentUser, users, roles, saveUsers } = useAppContext();
   const [profileForm, setProfileForm] = useState({ name: '', email: '', phone: '' });
   const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' });
   const [profileSaving, setProfileSaving] = useState(false);
@@ -114,6 +131,66 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ language }) => {
       setProfileForm({ name: currentUser.name, email: currentUser.email, phone: currentUser.phone });
     }
   }, [currentUser]);
+
+  const activeRole = useMemo(() => {
+    if (!currentUser) {
+      return null;
+    }
+    return roles.find((role) => role.id === currentUser.roleId) ?? null;
+  }, [currentUser, roles]);
+
+  const roleMembers = useMemo(() => {
+    if (!activeRole) {
+      return 0;
+    }
+    return users.filter((user) => user.roleId === activeRole.id).length;
+  }, [activeRole, users]);
+
+  const permissionCountLabel = useMemo(() => {
+    if (!activeRole) {
+      return language === 'ka' ? '0 უფლება' : '0 permissions';
+    }
+    const count = activeRole.permissions.length;
+    if (language === 'ka') {
+      return count === 1 ? '1 უფლება' : `${count} უფლება`;
+    }
+    return count === 1 ? '1 permission' : `${count} permissions`;
+  }, [activeRole, language]);
+
+  const avatarInitials = useMemo(() => {
+    if (!currentUser?.name) {
+      return '';
+    }
+    return currentUser.name
+      .split(' ')
+      .filter(Boolean)
+      .map((part) => part[0]?.toUpperCase() ?? '')
+      .slice(0, 2)
+      .join('');
+  }, [currentUser]);
+
+  const groupedPermissions = useMemo(() => {
+    if (!activeRole) {
+      return [] as { category: string; permissions: string[] }[];
+    }
+
+    const groups = new Map<string, string[]>();
+
+    ALL_PERMISSIONS.forEach(({ id, category }) => {
+      if (!activeRole.permissions.includes(id)) {
+        return;
+      }
+      if (!groups.has(category)) {
+        groups.set(category, []);
+      }
+      groups.get(category)?.push(id);
+    });
+
+    return Array.from(groups.entries()).map(([category, permissions]) => ({
+      category,
+      permissions
+    }));
+  }, [activeRole]);
 
   const handleProfileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
@@ -210,6 +287,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ language }) => {
     );
   }
 
+  const avatarDisplay = avatarInitials || currentUser.name.charAt(0).toUpperCase();
+  const roleBadge = activeRole ? (activeRole.id === 1 ? t.systemBadge : t.customBadge) : null;
+  const roleName = activeRole ? activeRole.name : t.roleHeading;
+
   return (
     <div className="space-y-10">
       <div>
@@ -217,141 +298,237 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ language }) => {
         <p className="text-slate-600 mt-2">{t.subheading}</p>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-3">
-        <div className="bg-white rounded-2xl shadow-sm p-8 lg:col-span-2 space-y-6">
-          <div>
-            <h2 className="text-xl font-semibold text-slate-800">{t.personalTitle}</h2>
-            <p className="text-sm text-slate-500 mt-1">{t.contactInfo}</p>
+      <div className="space-y-10">
+        <section className="bg-white rounded-3xl shadow-sm p-8 space-y-8">
+          <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-6">
+            <div className="flex items-start gap-4">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 text-white text-xl font-semibold">
+                {avatarDisplay}
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t.overviewTitle}</p>
+                <h2 className="mt-2 text-2xl font-semibold text-slate-800">{currentUser.name}</h2>
+                <p className="mt-2 text-sm text-slate-500 max-w-xl">{t.overviewSubtitle}</p>
+                <div className="mt-4 flex flex-wrap items-center gap-2 text-sm font-medium">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-2 text-blue-700">
+                    {roleName}
+                  </span>
+                  {roleBadge && (
+                    <span className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold text-blue-600 border border-blue-100">
+                      {roleBadge}
+                    </span>
+                  )}
+                  {activeRole && (
+                    <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-emerald-700">
+                      <ShieldCheck className="w-4 h-4" />
+                      {permissionCountLabel}
+                    </span>
+                  )}
+                  {activeRole && (
+                    <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-slate-600">
+                      <UsersIcon className="w-4 h-4" />
+                      {t.membersLabel(roleMembers)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {activeRole && (
+              <div className="rounded-2xl border border-blue-100 bg-blue-50/70 px-5 py-4 text-sm text-blue-700 max-w-sm">
+                <h3 className="text-base font-semibold text-blue-800">{t.roleSummaryTitle}</h3>
+                <p className="mt-2 text-sm text-blue-700/80">{t.roleSummarySubtitle}</p>
+                <p className="mt-3 text-sm font-medium text-blue-900">{activeRole.description}</p>
+              </div>
+            )}
           </div>
 
-          <form className="space-y-6" onSubmit={handleProfileSubmit}>
-            <div className="grid gap-6 md:grid-cols-2">
+          <dl className="grid gap-6 md:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+              <dt className="text-xs uppercase font-semibold text-slate-500">{t.nameLabel}</dt>
+              <dd className="mt-2 text-sm font-medium text-slate-800">{currentUser.name}</dd>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+              <dt className="text-xs uppercase font-semibold text-slate-500">{t.emailLabel}</dt>
+              <dd className="mt-2 text-sm font-medium text-slate-800 break-words">{currentUser.email}</dd>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+              <dt className="text-xs uppercase font-semibold text-slate-500">{t.phoneLabel}</dt>
+              <dd className="mt-2 text-sm font-medium text-slate-800">{currentUser.phone}</dd>
+            </div>
+          </dl>
+
+          <div className="space-y-4">
+            <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-800">{t.permissionsHeading}</h3>
+                <p className="text-sm text-slate-500">{t.permissionsHelper}</p>
+              </div>
+            </div>
+
+            {groupedPermissions.length === 0 ? (
+              <p className="text-sm text-slate-500">{t.permissionsEmpty}</p>
+            ) : (
+              <div className="space-y-4">
+                {groupedPermissions.map(({ category, permissions }) => {
+                  const categoryLabel = PERMISSION_CATEGORY_LABELS[category]?.[language] ?? category;
+                  return (
+                    <div key={category} className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+                      <h4 className="text-sm font-semibold text-emerald-700">{categoryLabel}</h4>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {permissions.map((permissionId) => (
+                          <span
+                            key={permissionId}
+                            className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-semibold text-emerald-700"
+                          >
+                            {PERMISSION_LABELS[permissionId][language]}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <div className="grid gap-8 lg:grid-cols-3">
+          <div className="bg-white rounded-2xl shadow-sm p-8 lg:col-span-2 space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-800">{t.personalTitle}</h2>
+              <p className="text-sm text-slate-500 mt-1">{t.contactInfo}</p>
+            </div>
+
+            <form className="space-y-6" onSubmit={handleProfileSubmit}>
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium text-slate-700 mb-2" htmlFor="name">
+                    {t.nameLabel}
+                  </label>
+                  <input
+                    id="name"
+                    name="name"
+                    value={profileForm.name}
+                    onChange={handleProfileChange}
+                    className="rounded-lg border border-slate-200 px-4 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder={t.nameLabel}
+                  />
+                </div>
+
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium text-slate-700 mb-2" htmlFor="email">
+                    {t.emailLabel}
+                  </label>
+                  <input
+                    id="email"
+                    name="email"
+                    value={profileForm.email}
+                    disabled
+                    className="rounded-lg border border-slate-200 px-4 py-2.5 text-slate-400 bg-slate-50"
+                  />
+                </div>
+              </div>
+
               <div className="flex flex-col">
-                <label className="text-sm font-medium text-slate-700 mb-2" htmlFor="name">
-                  {t.nameLabel}
+                <label className="text-sm font-medium text-slate-700 mb-2" htmlFor="phone">
+                  {t.phoneLabel}
                 </label>
                 <input
-                  id="name"
-                  name="name"
-                  value={profileForm.name}
+                  id="phone"
+                  name="phone"
+                  value={profileForm.phone}
                   onChange={handleProfileChange}
                   className="rounded-lg border border-slate-200 px-4 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder={t.nameLabel}
+                  placeholder="+995 555 000 000"
+                />
+              </div>
+
+              {profileError && <p className="text-sm text-rose-500">{profileError}</p>}
+              {profileMessage && <p className="text-sm text-emerald-600">{profileMessage}</p>}
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={profileSaving}
+                  className="px-6 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  {profileSaving ? t.saving : t.saveChanges}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm p-8 space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-800">{t.securityTitle}</h2>
+              <p className="text-sm text-slate-500 mt-1">
+                {language === 'ka'
+                  ? 'უსაფრთხოებისთვის რეგულარულად შეცვალეთ პაროლი და არ გააზიარო სხვა პირებთან.'
+                  : 'For best security, update your password regularly and never share it.'}
+              </p>
+            </div>
+
+            <form className="space-y-5" onSubmit={handlePasswordSubmit}>
+              <div className="flex flex-col">
+                <label className="text-sm font-medium text-slate-700 mb-2" htmlFor="current">
+                  {t.currentPassword}
+                </label>
+                <input
+                  id="current"
+                  name="current"
+                  type="password"
+                  value={passwordForm.current}
+                  onChange={handlePasswordChange}
+                  className="rounded-lg border border-slate-200 px-4 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoComplete="current-password"
                 />
               </div>
 
               <div className="flex flex-col">
-                <label className="text-sm font-medium text-slate-700 mb-2" htmlFor="email">
-                  {t.emailLabel}
+                <label className="text-sm font-medium text-slate-700 mb-2" htmlFor="next">
+                  {t.newPassword}
                 </label>
                 <input
-                  id="email"
-                  name="email"
-                  value={profileForm.email}
-                  disabled
-                  className="rounded-lg border border-slate-200 px-4 py-2.5 text-slate-400 bg-slate-50"
+                  id="next"
+                  name="next"
+                  type="password"
+                  value={passwordForm.next}
+                  onChange={handlePasswordChange}
+                  className="rounded-lg border border-slate-200 px-4 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoComplete="new-password"
                 />
               </div>
-            </div>
 
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-slate-700 mb-2" htmlFor="phone">
-                {t.phoneLabel}
-              </label>
-              <input
-                id="phone"
-                name="phone"
-                value={profileForm.phone}
-                onChange={handleProfileChange}
-                className="rounded-lg border border-slate-200 px-4 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="+995 555 000 000"
-              />
-            </div>
+              <div className="flex flex-col">
+                <label className="text-sm font-medium text-slate-700 mb-2" htmlFor="confirm">
+                  {t.confirmPassword}
+                </label>
+                <input
+                  id="confirm"
+                  name="confirm"
+                  type="password"
+                  value={passwordForm.confirm}
+                  onChange={handlePasswordChange}
+                  className="rounded-lg border border-slate-200 px-4 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoComplete="new-password"
+                />
+              </div>
 
-            {profileError && <p className="text-sm text-rose-500">{profileError}</p>}
-            {profileMessage && <p className="text-sm text-emerald-600">{profileMessage}</p>}
+              {passwordError && <p className="text-sm text-rose-500">{passwordError}</p>}
+              {passwordMessage && <p className="text-sm text-emerald-600">{passwordMessage}</p>}
 
-            <div className="flex justify-end">
-              <button
-                type="submit"
-                disabled={profileSaving}
-                className="px-6 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-              >
-                {profileSaving ? t.saving : t.saveChanges}
-              </button>
-            </div>
-          </form>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm p-8 space-y-6">
-          <div>
-            <h2 className="text-xl font-semibold text-slate-800">{t.securityTitle}</h2>
-            <p className="text-sm text-slate-500 mt-1">
-              {language === 'ka'
-                ? 'უსაფრთხოებისთვის რეგულარულად შეცვალეთ პაროლი და არ გააზიარო სხვა პირებთან.'
-                : 'For best security, update your password regularly and never share it.'}
-            </p>
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={passwordSaving}
+                  className="px-6 py-2.5 rounded-lg bg-slate-800 text-white text-sm font-semibold hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  {passwordSaving ? t.saving : t.updatePassword}
+                </button>
+              </div>
+            </form>
           </div>
-
-          <form className="space-y-5" onSubmit={handlePasswordSubmit}>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-slate-700 mb-2" htmlFor="current">
-                {t.currentPassword}
-              </label>
-              <input
-                id="current"
-                name="current"
-                type="password"
-                value={passwordForm.current}
-                onChange={handlePasswordChange}
-                className="rounded-lg border border-slate-200 px-4 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                autoComplete="current-password"
-              />
-            </div>
-
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-slate-700 mb-2" htmlFor="next">
-                {t.newPassword}
-              </label>
-              <input
-                id="next"
-                name="next"
-                type="password"
-                value={passwordForm.next}
-                onChange={handlePasswordChange}
-                className="rounded-lg border border-slate-200 px-4 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                autoComplete="new-password"
-              />
-            </div>
-
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-slate-700 mb-2" htmlFor="confirm">
-                {t.confirmPassword}
-              </label>
-              <input
-                id="confirm"
-                name="confirm"
-                type="password"
-                value={passwordForm.confirm}
-                onChange={handlePasswordChange}
-                className="rounded-lg border border-slate-200 px-4 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                autoComplete="new-password"
-              />
-            </div>
-
-            {passwordError && <p className="text-sm text-rose-500">{passwordError}</p>}
-            {passwordMessage && <p className="text-sm text-emerald-600">{passwordMessage}</p>}
-
-            <div className="flex justify-end">
-              <button
-                type="submit"
-                disabled={passwordSaving}
-                className="px-6 py-2.5 rounded-lg bg-slate-800 text-white text-sm font-semibold hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition"
-              >
-                {passwordSaving ? t.saving : t.updatePassword}
-              </button>
-            </div>
-          </form>
         </div>
       </div>
     </div>

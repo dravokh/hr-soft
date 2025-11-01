@@ -16,6 +16,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   { id: 'view_tickets', name: 'სერვის თიკეტების ნახვა', category: 'Tickets' },
   { id: 'create_tickets', name: 'სერვის თიკეტების შექმნა', category: 'Tickets' },
   { id: 'update_tickets', name: 'სერვის თიკეტების განახლება', category: 'Tickets' },
+  { id: 'set_ticket_priority', name: 'თიკეტების პრიორიტეტების მართვა', category: 'Tickets' },
   { id: 'manage_permissions', name: 'უფლებების მართვა', category: 'System' }
 ];
 
@@ -35,6 +36,7 @@ export const PERMISSION_LABELS: Record<string, { ka: string; en: string }> = {
   view_tickets: { ka: 'სერვის თიკეტების ნახვა', en: 'View tickets' },
   create_tickets: { ka: 'სერვის თიკეტების შექმნა', en: 'Create tickets' },
   update_tickets: { ka: 'სერვის თიკეტების განახლება', en: 'Update tickets' },
+  set_ticket_priority: { ka: 'თიკეტების პრიორიტეტების მართვა', en: 'Manage ticket priority' },
   manage_permissions: { ka: 'უფლებების მართვა', en: 'Manage permissions' }
 };
 

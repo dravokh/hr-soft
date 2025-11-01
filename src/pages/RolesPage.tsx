@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { PlusCircle, PencilLine, Trash2, ShieldCheck, Users as UsersIcon } from 'lucide-react';
+import { PlusCircle, PencilLine, Trash2, ShieldCheck, Users as UsersIcon, BadgeCheck } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { ALL_PERMISSIONS, PERMISSION_CATEGORY_LABELS, PERMISSION_LABELS } from '../constants/permissions';
 import { Role } from '../types';
@@ -80,7 +80,18 @@ const COPY: Record<RolesPageProps['language'], {
     noPermissions: 'ამ როლს ჯერ არ აქვს მინიჭებული უფლებები.',
     adminNotice: 'ადმინისტრატორის როლის უფლებები ავტომატურად სრულად აქტიურია.',
     noAccess: 'თქვენ არ გაქვთ როლების მართვის უფლება.',
-    permissionHint: 'აირჩიეთ უფლებები კატეგორიების მიხედვით ან გამოიყენეთ „ყველა უფლება“ სწრაფი მონიშვნისთვის.'
+    permissionHint: 'აირჩიეთ უფლებები კატეგორიების მიხედვით ან გამოიყენეთ „ყველა უფლება“ სწრაფი მონიშვნისთვის.',
+    membersLabel: (count: number) => {
+      if (count === 0) return '0 მომხმარებელი';
+      if (count === 1) return '1 მომხმარებელი';
+      return `${count} მომხმარებელი`;
+    },
+    permissionCount: (count: number) => {
+      if (count === 1) return '1 უფლება';
+      return `${count} უფლება`;
+    },
+    systemBadge: 'სისტემური',
+    customBadge: 'მორგებული'
   },
   en: {
     title: 'Role management',
@@ -111,7 +122,18 @@ const COPY: Record<RolesPageProps['language'], {
     noPermissions: 'No permissions are currently assigned to this role.',
     adminNotice: 'Administrator permissions are always fully enabled.',
     noAccess: 'You do not have permission to manage roles.',
-    permissionHint: 'Choose permissions by category or use “Select all permissions” for a quick assignment.'
+    permissionHint: 'Choose permissions by category or use “Select all permissions” for a quick assignment.',
+    membersLabel: (count: number) => {
+      if (count === 0) return '0 members';
+      if (count === 1) return '1 member';
+      return `${count} members`;
+    },
+    permissionCount: (count: number) => {
+      if (count === 1) return '1 permission';
+      return `${count} permissions`;
+    },
+    systemBadge: 'System',
+    customBadge: 'Custom'
   }
 };
 
@@ -155,7 +177,13 @@ export const RolesPage: React.FC<RolesPageProps> = ({ language }) => {
   useEffect(() => {
     if (!roles.length) {
       setSelectedRoleId(null);
-      setMode('create');
+      if (mode !== 'create') {
+        setMode('create');
+      }
+      return;
+    }
+
+    if (mode === 'create') {
       return;
     }
 
@@ -163,7 +191,7 @@ export const RolesPage: React.FC<RolesPageProps> = ({ language }) => {
       setSelectedRoleId(roles[0].id);
       setMode('view');
     }
-  }, [roles, selectedRoleId]);
+  }, [mode, roles, selectedRoleId]);
 
   const selectedRole = useMemo(() => {
     return roles.find((role) => role.id === selectedRoleId) ?? null;
@@ -197,8 +225,9 @@ export const RolesPage: React.FC<RolesPageProps> = ({ language }) => {
     setStatusMessage(null);
   };
 
-  const startEdit = () => {
-    if (!selectedRole) {
+  const startEdit = (roleOverride?: Role | null) => {
+    const target = roleOverride ?? selectedRole;
+    if (!target) {
       return;
     }
     if (!canEdit) {
@@ -206,10 +235,11 @@ export const RolesPage: React.FC<RolesPageProps> = ({ language }) => {
       setStatusMessage(null);
       return;
     }
+    setSelectedRoleId(target.id);
     setFormState({
-      name: selectedRole.name,
-      description: selectedRole.description,
-      permissions: selectedRole.permissions
+      name: target.name,
+      description: target.description,
+      permissions: target.permissions
     });
     setMode('edit');
     setErrorMessage(null);
@@ -318,8 +348,9 @@ export const RolesPage: React.FC<RolesPageProps> = ({ language }) => {
     }
   };
 
-  const handleDelete = async () => {
-    if (!selectedRole) {
+  const handleDelete = async (roleOverride?: Role | null) => {
+    const target = roleOverride ?? selectedRole;
+    if (!target) {
       return;
     }
     if (!canDelete) {
@@ -327,13 +358,13 @@ export const RolesPage: React.FC<RolesPageProps> = ({ language }) => {
       setStatusMessage(null);
       return;
     }
-    if (selectedRole.id === 1) {
+    if (target.id === 1) {
       setErrorMessage(t.deleteSystem);
       setStatusMessage(null);
       return;
     }
 
-    const assignedUsers = users.filter((user) => user.roleId === selectedRole.id);
+    const assignedUsers = users.filter((user) => user.roleId === target.id);
     if (assignedUsers.length > 0) {
       setErrorMessage(t.deleteAssigned);
       setStatusMessage(null);
@@ -342,10 +373,10 @@ export const RolesPage: React.FC<RolesPageProps> = ({ language }) => {
 
     setIsSaving(true);
     try {
-      await saveRoles(roles.filter((role) => role.id !== selectedRole.id));
+      await saveRoles(roles.filter((role) => role.id !== target.id));
       setStatusMessage(t.deleted);
       setErrorMessage(null);
-      const remaining = roles.filter((role) => role.id !== selectedRole.id);
+      const remaining = roles.filter((role) => role.id !== target.id);
       setSelectedRoleId(remaining[0]?.id ?? null);
       setMode(remaining.length ? 'view' : 'create');
     } finally {
@@ -518,7 +549,7 @@ export const RolesPage: React.FC<RolesPageProps> = ({ language }) => {
             {canEdit && (
               <button
                 type="button"
-                onClick={startEdit}
+                onClick={() => startEdit(selectedRole)}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50"
               >
                 <PencilLine className="w-4 h-4" />
@@ -528,7 +559,7 @@ export const RolesPage: React.FC<RolesPageProps> = ({ language }) => {
             {canDelete && selectedRole.id !== 1 && (
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={() => void handleDelete(selectedRole)}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-50 text-sm font-semibold text-rose-600 hover:bg-rose-100"
               >
                 <Trash2 className="w-4 h-4" />
@@ -582,11 +613,12 @@ export const RolesPage: React.FC<RolesPageProps> = ({ language }) => {
         </button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
+      <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
         <div className="space-y-4">
           {roles.map((role) => {
             const isActive = role.id === selectedRoleId;
             const assignments = users.filter((user) => user.roleId === role.id).length;
+            const badgeLabel = role.id === 1 ? t.systemBadge : t.customBadge;
             return (
               <button
                 type="button"
@@ -597,18 +629,61 @@ export const RolesPage: React.FC<RolesPageProps> = ({ language }) => {
                   setErrorMessage(null);
                   setStatusMessage(null);
                 }}
-                className={`w-full text-left rounded-2xl border p-5 transition shadow-sm ${
+                className={`w-full text-left rounded-2xl border p-6 transition shadow-sm ${
                   isActive ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-200'
                 }`}
               >
                 <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h3 className="text-base font-semibold text-slate-800">{role.name}</h3>
-                    <p className="text-sm text-slate-500 mt-1 line-clamp-2">{role.description}</p>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-semibold text-slate-800">{role.name}</h3>
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                          role.id === 1 ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        <BadgeCheck className="w-3.5 h-3.5" />
+                        {badgeLabel}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-500 leading-relaxed">{role.description}</p>
+                    <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500">
+                      <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 border border-slate-200">
+                        <UsersIcon className="w-3.5 h-3.5 text-blue-500" />
+                        {t.membersLabel(assignments)}
+                      </span>
+                      <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 border border-slate-200">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                        {t.permissionCount(role.permissions.length)}
+                      </span>
+                    </div>
                   </div>
-                  <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
-                    {assignments}
-                  </span>
+                  <div className="flex items-start gap-2">
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          startEdit(role);
+                        }}
+                        className="rounded-full border border-slate-200 bg-white p-2 text-slate-500 hover:text-blue-600 hover:border-blue-200"
+                      >
+                        <PencilLine className="w-4 h-4" />
+                      </button>
+                    )}
+                    {canDelete && role.id !== 1 && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleDelete(role);
+                        }}
+                        className="rounded-full border border-slate-200 bg-white p-2 text-rose-500 hover:text-rose-600 hover:border-rose-200"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </button>
             );
