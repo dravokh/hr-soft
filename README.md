@@ -6,6 +6,7 @@ Key modules include:
 
 - **Ticket desk:** capture employee requests, track progress, and resolve blockers from a centralized workflow.
 - **Applications workflow:** configure multi-step approval flows with SLA automation, delegates, attachments, and an audit timeline.
+- **Application type builder:** design reusable request templates with custom fields, approval steps, and SLA rules.
 - **User management:** onboard new teammates with role assignments and phone details.
 - **Role & permission management:** build bespoke roles, assign granular permissions, and audit access from a single matrix.
 - **Employee profile:** let teammates update their contact details and rotate passwords without leaving the dashboard.
@@ -54,6 +55,7 @@ hr-soft/
 │   │   ├── DashboardPage.tsx
 │   │   ├── PermissionsPage.tsx
 │   │   ├── ApplicationsPage.tsx
+│   │   ├── ApplicationTypesPage.tsx
 │   │   ├── ProfilePage.tsx
 │   │   ├── RolesPage.tsx
 │   │   ├── TicketsPage.tsx

@@ -1,5 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { LayoutDashboard, UserCog, Shield, Users, Lock, Ticket as TicketIcon, FileText } from 'lucide-react';
+import {
+  LayoutDashboard,
+  UserCog,
+  Shield,
+  Users,
+  Lock,
+  Ticket as TicketIcon,
+  FileText,
+  Settings2
+} from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import { DashboardPage } from '../../pages/DashboardPage';
 import { ProfilePage } from '../../pages/ProfilePage';
@@ -8,6 +17,7 @@ import { UsersPage } from '../../pages/UsersPage';
 import { PermissionsPage } from '../../pages/PermissionsPage';
 import { TicketsPage } from '../../pages/TicketsPage';
 import { ApplicationsPage } from '../../pages/ApplicationsPage';
+import { ApplicationTypesPage } from '../../pages/ApplicationTypesPage';
 import { MainLayout, MenuItem } from './MainLayout';
 
 const MENU_DEFINITIONS: MenuItem[] = [
@@ -17,6 +27,7 @@ const MENU_DEFINITIONS: MenuItem[] = [
   { id: 'users', icon: Users, label: { ka: 'მომხმარებლები', en: 'Users' } },
   { id: 'tickets', icon: TicketIcon, label: { ka: 'თიკეტები', en: 'Tickets' } },
   { id: 'applications', icon: FileText, label: { ka: 'განაცხადები', en: 'Applications' } },
+  { id: 'applicationTypes', icon: Settings2, label: { ka: 'განაცხადების ტიპები', en: 'Application types' } },
   { id: 'permissions', icon: Lock, label: { ka: 'უფლებები', en: 'Permissions' } }
 ];
 
@@ -27,6 +38,7 @@ const MENU_PERMISSIONS: Record<string, string> = {
   users: 'view_users',
   tickets: 'view_tickets',
   applications: 'view_requests',
+  applicationTypes: 'manage_request_types',
   permissions: 'manage_permissions'
 };
 
@@ -61,6 +73,8 @@ export const DashboardLayout: React.FC = () => {
         return <TicketsPage language={language} />;
       case 'applications':
         return <ApplicationsPage language={language} />;
+      case 'applicationTypes':
+        return <ApplicationTypesPage language={language} />;
       case 'permissions':
         return <PermissionsPage language={language} />;
       default:
