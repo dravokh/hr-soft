@@ -13,5 +13,8 @@ export const ALL_PERMISSIONS: Permission[] = [
   { id: 'view_requests', name: 'მოთხოვნების ნახვა', category: 'Requests' },
   { id: 'create_requests', name: 'მოთხოვნების შექმნა', category: 'Requests' },
   { id: 'approve_requests', name: 'მოთხოვნების დამტკიცება', category: 'Requests' },
+  { id: 'view_tickets', name: 'სერვის თიკეტების ნახვა', category: 'Tickets' },
+  { id: 'create_tickets', name: 'სერვის თიკეტების შექმნა', category: 'Tickets' },
+  { id: 'update_tickets', name: 'სერვის თიკეტების განახლება', category: 'Tickets' },
   { id: 'manage_permissions', name: 'უფლებების მართვა', category: 'System' }
 ];

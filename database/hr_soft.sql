@@ -13,6 +13,7 @@ USE `hr_soft`;
 
 -- Drop tables if they already exist so the script can be re-imported safely
 DROP TABLE IF EXISTS `sessions`;
+DROP TABLE IF EXISTS `tickets`;
 DROP TABLE IF EXISTS `role_permissions`;
 DROP TABLE IF EXISTS `users`;
 DROP TABLE IF EXISTS `permissions`;
@@ -52,6 +53,9 @@ INSERT INTO `permissions` (`id`, `name`, `category`) VALUES
   ('view_requests', 'მოთხოვნების ნახვა', 'Requests'),
   ('create_requests', 'მოთხოვნების შექმნა', 'Requests'),
   ('approve_requests', 'მოთხოვნების დამტკიცება', 'Requests'),
+  ('view_tickets', 'სერვის თიკეტების ნახვა', 'Tickets'),
+  ('create_tickets', 'სერვის თიკეტების შექმნა', 'Tickets'),
+  ('update_tickets', 'სერვის თიკეტების განახლება', 'Tickets'),
   ('manage_permissions', 'უფლებების მართვა', 'System');
 
 -- Junction table linking roles to their permissions
@@ -76,13 +80,17 @@ INSERT INTO `role_permissions` (`role_id`, `permission_id`) VALUES
   (2, 'view_dashboard'),
   (2, 'view_users'),
   (2, 'view_requests'),
-  (2, 'approve_requests');
+  (2, 'approve_requests'),
+  (2, 'view_tickets'),
+  (2, 'update_tickets');
 
 -- Employee role permissions
 INSERT INTO `role_permissions` (`role_id`, `permission_id`) VALUES
   (3, 'view_dashboard'),
   (3, 'view_requests'),
-  (3, 'create_requests');
+  (3, 'create_requests'),
+  (3, 'view_tickets'),
+  (3, 'create_tickets');
 
 -- User accounts
 CREATE TABLE `users` (
@@ -106,6 +114,37 @@ INSERT INTO `users` (`id`, `name`, `email`, `phone`, `password`, `role_id`, `ava
   (3, 'Employee User', 'user@hr.com', '+995 555 000 003', 'user123', 3, 'E');
 
 ALTER TABLE `users`
+  AUTO_INCREMENT = 4;
+
+-- Service tickets raised by employees and handled by HR
+CREATE TABLE `tickets` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `title` VARCHAR(200) NOT NULL,
+  `description` TEXT NOT NULL,
+  `status` ENUM('open','in_progress','resolved') NOT NULL DEFAULT 'open',
+  `priority` ENUM('low','medium','high') NOT NULL DEFAULT 'medium',
+  `created_by` INT NOT NULL,
+  `assigned_to` INT DEFAULT NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `tickets_created_by_idx` (`created_by`),
+  KEY `tickets_assigned_to_idx` (`assigned_to`),
+  CONSTRAINT `tickets_created_by_fk`
+    FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `tickets_assigned_to_fk`
+    FOREIGN KEY (`assigned_to`) REFERENCES `users` (`id`)
+    ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `tickets` (`id`, `title`, `description`, `status`, `priority`, `created_by`, `assigned_to`, `created_at`, `updated_at`)
+VALUES
+  (1, 'Onboarding laptop request', 'Need a laptop configured for the new marketing hire starting next Monday.', 'in_progress', 'high', 2, 1, '2024-05-01 08:30:00', '2024-05-02 09:15:00'),
+  (2, 'Update payroll bank details', 'Employee User submitted new banking information that must be reflected before the next payroll run.', 'open', 'medium', 3, 2, '2024-05-10 12:00:00', '2024-05-10 12:00:00'),
+  (3, 'Broken office badge', 'My access badge is no longer working after the hardware refresh. Requesting a replacement.', 'resolved', 'low', 3, 2, '2024-04-18 07:20:00', '2024-04-19 10:45:00');
+
+ALTER TABLE `tickets`
   AUTO_INCREMENT = 4;
 
 -- Session history (empty by default but ready for use)

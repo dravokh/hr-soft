@@ -1,12 +1,23 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { TicketStatus } from '../types';
 
 interface DashboardPageProps {
   language: 'ka' | 'en';
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({ language }) => {
-  const { currentUser } = useAppContext();
+  const { currentUser, tickets } = useAppContext();
+
+  const ticketSummary = useMemo(() => {
+    return tickets.reduce(
+      (acc, ticket) => {
+        acc[ticket.status] += 1;
+        return acc;
+      },
+      { open: 0, in_progress: 0, resolved: 0 } as Record<TicketStatus, number>
+    );
+  }, [tickets]);
 
   return (
     <div>
@@ -18,22 +29,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ language }) => {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
         <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-sm text-slate-600 mb-2">{language === 'ka' ? 'მიმდინარე' : 'Pending'}</h3>
-          <div className="text-3xl font-bold text-slate-800">0</div>
+          <h3 className="text-sm text-slate-600 mb-2">{language === 'ka' ? 'ღია თიკეტები' : 'Open tickets'}</h3>
+          <div className="text-3xl font-bold text-slate-800">{ticketSummary.open}</div>
         </div>
         <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-sm text-slate-600 mb-2">{language === 'ka' ? 'დამტკიცებული' : 'Approved'}</h3>
-          <div className="text-3xl font-bold text-slate-800">0</div>
+          <h3 className="text-sm text-slate-600 mb-2">{language === 'ka' ? 'მიმდინარე თიკეტები' : 'In progress'}</h3>
+          <div className="text-3xl font-bold text-slate-800">{ticketSummary.in_progress}</div>
         </div>
         <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-sm text-slate-600 mb-2">{language === 'ka' ? 'უარყოფილი' : 'Rejected'}</h3>
-          <div className="text-3xl font-bold text-slate-800">0</div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-sm text-slate-600 mb-2">{language === 'ka' ? 'დოკუმენტები' : 'Documents'}</h3>
-          <div className="text-3xl font-bold text-slate-800">0</div>
+          <h3 className="text-sm text-slate-600 mb-2">{language === 'ka' ? 'დასრულებული თიკეტები' : 'Resolved tickets'}</h3>
+          <div className="text-3xl font-bold text-slate-800">{ticketSummary.resolved}</div>
         </div>
       </div>
 

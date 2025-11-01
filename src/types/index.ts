@@ -21,6 +21,21 @@ export interface User {
   avatar: string;
 }
 
+export type TicketStatus = 'open' | 'in_progress' | 'resolved';
+export type TicketPriority = 'low' | 'medium' | 'high';
+
+export interface Ticket {
+  id: number;
+  title: string;
+  description: string;
+  status: TicketStatus;
+  priority: TicketPriority;
+  createdById: number;
+  assignedToId: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Session {
   userId: number;
   timestamp: number;
@@ -37,10 +52,12 @@ export interface AppContextValue {
   currentUser: User | null;
   isAuthenticated: boolean;
   loading: boolean;
+  tickets: Ticket[];
   login: (email: string, password: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
   loadAllData: () => Promise<void>;
   saveRoles: (roles: Role[]) => Promise<void>;
   saveUsers: (users: User[]) => Promise<void>;
+  saveTickets: (tickets: Ticket[]) => Promise<void>;
   hasPermission: (permissionId: string) => boolean;
 }

@@ -2,6 +2,12 @@
 
 A modern HR management demo built with React, Vite, and Tailwind CSS. The application showcases role-based navigation, bilingual authentication, and a responsive dashboard layout.
 
+Key modules include:
+
+- **Ticket desk:** capture employee requests, track progress, and resolve blockers from a centralized workflow.
+- **User management:** onboard new teammates with role assignments and phone details.
+- **Role-based access:** demonstrate granular permissions across HR, Admin, and Employee personas.
+
 ## Getting Started
 
 ```bash
@@ -47,6 +53,7 @@ hr-soft/
 │   │   ├── PermissionsPage.tsx
 │   │   ├── ProfilePage.tsx
 │   │   ├── RolesPage.tsx
+│   │   ├── TicketsPage.tsx
 │   │   └── UsersPage.tsx
 │   ├── types/
 │   │   └── index.ts
@@ -78,8 +85,9 @@ SOURCE /path/to/database/hr_soft.sql;
 ```
 
 The script creates the `hr_soft` schema, tables for roles, permissions,
-role assignments, users (with phone numbers), and an empty sessions table, then
-populates it with the same demo records used by the React app.
+role assignments, users (with phone numbers), service tickets, and an empty
+sessions table, then populates it with the same demo records used by the React
+app.
 
 ### Option 1 – Download everything as a single archive
 
