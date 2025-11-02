@@ -33,6 +33,7 @@ export const ApplicationTypesPage: React.FC<ApplicationTypesPageProps> = ({ lang
 
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(applicationTypes[0]?.id ?? null);
   const [mode, setMode] = useState<Mode>(applicationTypes.length ? 'view' : 'create');
+  const [pendingSelectedId, setPendingSelectedId] = useState<number | null>(null);
   const [formState, setFormState] = useState<FormState>(() =>
     applicationTypes[0] ? buildFormStateFromType(applicationTypes[0]) : buildDefaultFormState()
   );
@@ -59,15 +60,40 @@ export const ApplicationTypesPage: React.FC<ApplicationTypesPageProps> = ({ lang
       setSelectedTypeId(null);
       setMode('create');
       setFormState(buildDefaultFormState());
+      setPendingSelectedId(null);
       return;
     }
 
-    if (selectedTypeId === null || !applicationTypes.some((type) => type.id === selectedTypeId)) {
-      setSelectedTypeId(applicationTypes[0].id);
-      setMode('view');
-      setFormState(buildFormStateFromType(applicationTypes[0]));
+    if (mode === 'create') {
+      return;
     }
-  }, [applicationTypes, selectedTypeId]);
+
+    if (pendingSelectedId !== null) {
+      const pendingType = applicationTypes.find((type) => type.id === pendingSelectedId);
+      if (pendingType) {
+        setSelectedTypeId(pendingType.id);
+        setFormState(buildFormStateFromType(pendingType));
+        setMode('view');
+        setPendingSelectedId(null);
+      }
+      return;
+    }
+
+    if (selectedTypeId === null) {
+      const first = applicationTypes[0];
+      setSelectedTypeId(first.id);
+      setMode('view');
+      setFormState(buildFormStateFromType(first));
+      return;
+    }
+
+    if (!applicationTypes.some((type) => type.id === selectedTypeId)) {
+      const first = applicationTypes[0];
+      setSelectedTypeId(first.id);
+      setMode('view');
+      setFormState(buildFormStateFromType(first));
+    }
+  }, [applicationTypes, mode, pendingSelectedId, selectedTypeId]);
 
   useEffect(() => {
     if (selectedType && mode === 'view') {
@@ -110,6 +136,7 @@ export const ApplicationTypesPage: React.FC<ApplicationTypesPageProps> = ({ lang
     setStatusMessage(null);
     setErrorMessage(null);
     setAllowedRolesOpen(false);
+    setPendingSelectedId(null);
   };
 
   const startEdit = () => {
@@ -121,6 +148,7 @@ export const ApplicationTypesPage: React.FC<ApplicationTypesPageProps> = ({ lang
     setStatusMessage(null);
     setErrorMessage(null);
     setAllowedRolesOpen(false);
+    setPendingSelectedId(null);
   };
 
   const cancelEditing = () => {
@@ -129,6 +157,7 @@ export const ApplicationTypesPage: React.FC<ApplicationTypesPageProps> = ({ lang
       setFormState(buildDefaultFormState());
       setSelectedTypeId(null);
       setAllowedRolesOpen(false);
+      setPendingSelectedId(null);
       return;
     }
     if (selectedType) {
@@ -138,6 +167,7 @@ export const ApplicationTypesPage: React.FC<ApplicationTypesPageProps> = ({ lang
     setStatusMessage(null);
     setErrorMessage(null);
     setAllowedRolesOpen(false);
+    setPendingSelectedId(null);
   };
 
   const handleSelectType = (id: number) => {
@@ -147,6 +177,7 @@ export const ApplicationTypesPage: React.FC<ApplicationTypesPageProps> = ({ lang
     setStatusMessage(null);
     setErrorMessage(null);
     setAllowedRolesOpen(false);
+    setPendingSelectedId(null);
     if (next) {
       setFormState(buildFormStateFromType(next));
     }
@@ -232,6 +263,7 @@ export const ApplicationTypesPage: React.FC<ApplicationTypesPageProps> = ({ lang
         const created = await createApplicationType(buildPayload());
         setStatusMessage(t.successCreated);
         setMode('view');
+        setPendingSelectedId(created.id);
         setSelectedTypeId(created.id);
         setAllowedRolesOpen(false);
         setFormState(buildFormStateFromType(created));
@@ -243,6 +275,7 @@ export const ApplicationTypesPage: React.FC<ApplicationTypesPageProps> = ({ lang
         setStatusMessage(t.successUpdated);
         setMode('view');
         setAllowedRolesOpen(false);
+        setPendingSelectedId(null);
       }
     } catch (error) {
       console.error(error);
@@ -269,6 +302,7 @@ export const ApplicationTypesPage: React.FC<ApplicationTypesPageProps> = ({ lang
         setSelectedTypeId(nextSelected?.id ?? null);
         setFormState(nextSelected ? buildFormStateFromType(nextSelected) : buildDefaultFormState());
         setAllowedRolesOpen(false);
+        setPendingSelectedId(null);
       }
     } catch (error) {
       console.error(error);
