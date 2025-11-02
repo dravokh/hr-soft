@@ -8,6 +8,7 @@ import {
   FileText,
   MessageSquare,
   Paperclip,
+  Search,
   PlusCircle,
   Printer,
   Send,
@@ -189,6 +190,7 @@ const COPY: Record<
   {
     title: string;
     subtitle: string;
+    searchPlaceholder: string;
     create: string;
     tabs: { all: string; pending: string; sent: string; returned: string };
     table: { number: string; type: string; requester: string; status: string; updated: string; action: string; empty: string };
@@ -200,6 +202,9 @@ const COPY: Record<
       comment: string;
       attachments: string;
       history: string;
+      showHistory: string;
+      hideHistory: string;
+      historyPrompt: string;
       approve: string;
       reject: string;
       resend: string;
@@ -215,6 +220,8 @@ const COPY: Record<
     createModal: {
       title: string;
       selectType: string;
+      selectPlaceholder: string;
+      selectPrompt: string;
       formTitle: string;
       submit: string;
       submitting: string;
@@ -234,6 +241,7 @@ const COPY: Record<
   ka: {
     title: 'განაცხადები',
     subtitle: 'დააკვირდით დამტკიცების პროცესს, გააზიარეთ კომენტარები და მართეთ ავტომატური შეტყობინებები.',
+    searchPlaceholder: 'ძიება ნომრის, ავტორის, სტატუსის ან თარიღის მიხედვით…',
     create: '+ ახალი განაცხადი',
     tabs: { all: 'ყველა', pending: 'მოლოდინში', sent: 'ჩემი გაგზავნილები', returned: 'უკან დაბრუნებული' },
     table: {
@@ -253,6 +261,9 @@ const COPY: Record<
       comment: 'კომენტარი',
       attachments: 'დანართები',
       history: 'ქმედებები',
+      showHistory: 'ქმედებების ნახვა',
+      hideHistory: 'ქმედებების დამალვა',
+      historyPrompt: 'დააჭირეთ ღილაკს, თუ აქტივობის ნახვა გსურთ.',
       approve: 'დამტკიცება',
       reject: 'დაბრუნება',
       resend: 'რედაქტირება და ხელახლა გაგზავნა',
@@ -268,6 +279,8 @@ const COPY: Record<
     createModal: {
       title: 'ახალი განაცხადის შექმნა',
       selectType: 'აირჩიეთ განაცხადის ტიპი',
+      selectPlaceholder: 'აირჩიეთ ტიპი…',
+      selectPrompt: 'ტიპის არჩევის შემდეგ გამოჩნდება მისთვის კონფიგურირებული ველები.',
       formTitle: 'მთავარი ინფორმაცია',
       submit: 'გაგზავნა',
       submitting: ' იგზავნება…',
@@ -286,6 +299,7 @@ const COPY: Record<
   en: {
     title: 'Applications',
     subtitle: 'Track approval workflows, share comments, and manage automated notifications.',
+    searchPlaceholder: 'Search by number, requester, status, or date…',
     create: '+ New application',
     tabs: { all: 'All', pending: 'Pending', sent: 'Sent', returned: 'Returned' },
     table: {
@@ -305,6 +319,9 @@ const COPY: Record<
       comment: 'Comment',
       attachments: 'Attachments',
       history: 'Activity',
+      showHistory: 'Show activity',
+      hideHistory: 'Hide activity',
+      historyPrompt: 'Use the button when you need to review the activity log.',
       approve: 'Approve',
       reject: 'Return',
       resend: 'Edit & resend',
@@ -320,6 +337,8 @@ const COPY: Record<
     createModal: {
       title: 'Create a new application',
       selectType: 'Choose application type',
+      selectPlaceholder: 'Select a type…',
+      selectPrompt: 'Pick an application type to load the fields you configured for it.',
       formTitle: 'Primary information',
       submit: 'Submit',
       submitting: 'Submitting…',
@@ -432,6 +451,8 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [editAttachments, setEditAttachments] = useState<AttachmentDraft[]>([]);
   const [editComment, setEditComment] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showActivity, setShowActivity] = useState(false);
 
   const createFileInputRef = useRef<HTMLInputElement | null>(null);
   const editFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -533,10 +554,60 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
         ? returnedApplications
         : accessibleApplications;
 
-    return [...source].sort(
+    const sorted = [...source].sort(
       (a, b) => new Date(b.application.updatedAt).getTime() - new Date(a.application.updatedAt).getTime()
     );
-  }, [activeTab, accessibleApplications, pendingApplications, returnedApplications, sentApplications]);
+
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) {
+      return sorted;
+    }
+
+    return sorted.filter((bundle) => {
+      const number = bundle.application.number.toLowerCase();
+      if (number.includes(query)) {
+        return true;
+      }
+
+      const type = typeById.get(bundle.application.typeId);
+      const requester = userById.get(bundle.application.requesterId);
+      const statusMeta = STATUS_META[bundle.application.status];
+
+      const typeName = type?.name[language]?.toLowerCase() ?? '';
+      const typeDescription = type?.description[language]?.toLowerCase() ?? '';
+      if (typeName.includes(query) || typeDescription.includes(query)) {
+        return true;
+      }
+
+      const requesterName = requester?.name?.toLowerCase() ?? '';
+      if (requesterName.includes(query)) {
+        return true;
+      }
+
+      const statusLabel = statusMeta.label[language].toLowerCase();
+      if (statusLabel.includes(query) || bundle.application.status.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      const created = formatDateTime(bundle.application.createdAt, language).toLowerCase();
+      const updated = formatDateTime(bundle.application.updatedAt, language).toLowerCase();
+      if (created.includes(query) || updated.includes(query)) {
+        return true;
+      }
+
+      return false;
+    });
+  }, [
+    accessibleApplications,
+    activeTab,
+    language,
+    pendingApplications,
+    returnedApplications,
+    searchTerm,
+    sentApplications,
+    typeById,
+    userById
+  ]);
 
   const selectedType = selectedTypeId ? typeById.get(selectedTypeId) ?? null : null;
 
@@ -545,10 +616,13 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
       setSelectedTypeId(null);
       return;
     }
-    if (!selectedTypeId || !availableTypes.some((type) => type.id === selectedTypeId)) {
+    if (selectedTypeId !== null && availableTypes.some((type) => type.id === selectedTypeId)) {
+      return;
+    }
+    if (!createOpen) {
       setSelectedTypeId(availableTypes[0].id);
     }
-  }, [availableTypes, selectedTypeId]);
+  }, [availableTypes, selectedTypeId, createOpen]);
 
   useEffect(() => {
     if (!selected) {
@@ -566,7 +640,7 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     setCreateAttachments([]);
     setCreateError(null);
     setCreateSuccess(null);
-    setSelectedTypeId(availableTypes[0]?.id ?? null);
+    setSelectedTypeId(null);
   };
 
   const handleCreateFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -823,6 +897,8 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
       return;
     }
 
+    const submissionComment = createComment.trim() ? createComment.trim() : undefined;
+
     try {
       const values: ApplicationFieldValue[] = selectedType.fields.map((field) => ({
         applicationId: 0,
@@ -835,10 +911,10 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
         requesterId: currentUser.id,
         values,
         attachments: attachmentsPayload,
-        comment: createComment
+        comment: submissionComment
       });
 
-      await submitApplication(bundle.application.id, currentUser.id, createComment);
+      await submitApplication(bundle.application.id, currentUser.id, submissionComment);
 
       setCreateSuccess(t.createModal.success);
       setTimeout(() => {
@@ -859,6 +935,7 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     setActionError(null);
     setRejectComment('');
     setIsEditing(false);
+    setShowActivity(false);
     setEditValues(
       bundle.values.reduce<Record<string, string>>((accumulator, value) => {
         accumulator[value.key] = value.value;
@@ -875,6 +952,7 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     setIsEditing(false);
     setActionMessage(null);
     setActionError(null);
+    setShowActivity(false);
   };
 
   const handleApprove = async () => {
@@ -1317,7 +1395,7 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
   };
 
   const renderCreateModal = () => {
-    if (!createOpen || !selectedType) {
+    if (!createOpen) {
       return null;
     }
 
@@ -1327,7 +1405,9 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
           <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4">
             <div>
               <h2 className="text-xl font-bold text-slate-800">{t.createModal.title}</h2>
-              <p className="text-sm text-slate-500">{selectedType.description[language]}</p>
+              <p className="text-sm text-slate-500">
+                {selectedType ? selectedType.description[language] : t.createModal.selectPrompt}
+              </p>
             </div>
             <button
               className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
@@ -1340,139 +1420,141 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
             </button>
           </div>
           <form onSubmit={handleCreateSubmit} className="max-h-[75vh] overflow-y-auto px-6 py-5">
-            <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {availableTypes.map((type) => {
-                const isActive = type.id === selectedType.id;
-                return (
-                  <button
-                    key={type.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedTypeId(type.id);
-                      setCreateValues({});
-                      setCreateAttachments([]);
-                    }}
-                    className={classNames(
-                      'flex flex-col gap-1 rounded-xl border px-4 py-3 text-left transition',
-                      isActive
-                        ? 'border-sky-500 bg-sky-50 shadow'
-                        : 'border-slate-200 hover:border-sky-200 hover:bg-slate-50'
-                    )}
-                  >
-                    <p className="font-semibold text-slate-700">{type.name[language]}</p>
-                    <p className="text-sm text-slate-500">{type.description[language]}</p>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-5">
-              <div className="mb-4">
-                <p className="text-lg font-semibold text-slate-800">{selectedType.name[language]}</p>
-                <p className="text-sm text-slate-500">{t.createModal.formTitle}</p>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700" htmlFor="create-type">
+                  {t.createModal.selectType}
+                </label>
+                <select
+                  id="create-type"
+                  value={selectedTypeId ?? ''}
+                  onChange={(event) => {
+                    const value = event.target.value ? Number(event.target.value) : null;
+                    setSelectedTypeId(value);
+                    setCreateValues({});
+                    setCreateAttachments([]);
+                    setCreateComment('');
+                    setCreateError(null);
+                    setCreateSuccess(null);
+                    if (createFileInputRef.current) {
+                      createFileInputRef.current.value = '';
+                    }
+                  }}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                >
+                  <option value="">{t.createModal.selectPlaceholder}</option>
+                  {availableTypes.map((type) => (
+                    <option key={type.id} value={type.id}>
+                      {type.name[language]}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <div className="space-y-4">
-                {selectedType.fields.map((field) => (
-                  <div key={field.key} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm font-semibold text-slate-700">
-                        {field.label[language]}
-                      </label>
-                      {field.required && <span className="text-xs text-rose-500">*</span>}
-                    </div>
-                    {renderFieldInput(field, createValues, (next) => setCreateValues(next))}
-                    {field.helper && <p className="text-xs text-slate-500">{field.helper[language]}</p>}
+
+              {selectedType ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-5">
+                  <div className="mb-4">
+                    <p className="text-lg font-semibold text-slate-800">{selectedType.name[language]}</p>
+                    <p className="text-sm text-slate-500">{t.createModal.formTitle}</p>
                   </div>
-                ))}
-
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">{t.createModal.commentLabel}</label>
-                  <textarea
-                    value={createComment}
-                    onChange={(event) => setCreateComment(event.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                    rows={3}
-                  />
-                </div>
-
-                {selectedType.capabilities.allowsAttachments && (
-                  <div className="space-y-3">
-                    <label className="text-sm font-semibold text-slate-700">{t.createModal.attachmentLabel}</label>
-                    {createAttachments.map((attachment, index) => (
-                      <div
-                        key={`attachment-${index}`}
-                        className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
-                      >
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-                          <input
-                            type="text"
-                            value={attachment.name}
-                            placeholder="document.pdf"
-                            onChange={(event) => {
-                              const next = [...createAttachments];
-                              next[index] = { ...next[index], name: event.target.value };
-                              setCreateAttachments(next);
-                            }}
-                            className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                          />
-                          {attachment.fromUpload ? (
-                            <span className="text-xs font-medium text-slate-500">
-                              {formatFileSize(attachment.sizeBytes ?? 0, language)}
-                            </span>
-                          ) : (
-                            <input
-                              type="text"
-                              value={attachment.url}
-                              placeholder="https://…"
-                              onChange={(event) => {
-                                const next = [...createAttachments];
-                                next[index] = { ...next[index], url: event.target.value };
-                                setCreateAttachments(next);
-                              }}
-                              className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                            />
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCreateAttachments(createAttachments.filter((_, idx) => idx !== index));
-                            }}
-                            className="rounded-lg border border-transparent p-2 text-slate-400 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
+                  <div className="space-y-4">
+                    {selectedType.fields.map((field) => (
+                      <div key={field.key} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-sm font-semibold text-slate-700">
+                            {field.label[language]}
+                          </label>
+                          {field.required && <span className="text-xs text-rose-500">*</span>}
                         </div>
+                        {renderFieldInput(field, createValues, (next) => setCreateValues(next))}
+                        {field.helper && <p className="text-xs text-slate-500">{field.helper[language]}</p>}
                       </div>
                     ))}
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-                      <input
-                        ref={createFileInputRef}
-                        type="file"
-                        className="hidden"
-                        multiple
-                        onChange={handleCreateFileUpload}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => createFileInputRef.current?.click()}
-                        className="flex items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-600 transition hover:border-sky-300 hover:text-sky-600"
-                      >
-                        <Paperclip className="h-4 w-4" />
-                        {t.createModal.uploadFromComputer}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCreateAttachments([...createAttachments, { name: '', url: '' }])}
-                        className="flex items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-600 transition hover:border-sky-300 hover:text-sky-600"
-                      >
-                        <PlusCircle className="h-4 w-4" />
-                        {t.createModal.addLink}
-                      </button>
-                    </div>
-                    <p className="text-xs text-slate-500">{t.createModal.attachmentHelp}</p>
+
+                    {selectedType.capabilities.allowsAttachments && (
+                      <div className="space-y-3">
+                        <label className="text-sm font-semibold text-slate-700">{t.createModal.attachmentLabel}</label>
+                        {createAttachments.map((attachment, index) => (
+                          <div
+                            key={`attachment-${index}`}
+                            className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+                          >
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                              <input
+                                type="text"
+                                value={attachment.name}
+                                placeholder="document.pdf"
+                                onChange={(event) => {
+                                  const next = [...createAttachments];
+                                  next[index] = { ...next[index], name: event.target.value };
+                                  setCreateAttachments(next);
+                                }}
+                                className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                              />
+                              {attachment.fromUpload ? (
+                                <span className="text-xs font-medium text-slate-500">
+                                  {formatFileSize(attachment.sizeBytes ?? 0, language)}
+                                </span>
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={attachment.url}
+                                  placeholder="https://…"
+                                  onChange={(event) => {
+                                    const next = [...createAttachments];
+                                    next[index] = { ...next[index], url: event.target.value };
+                                    setCreateAttachments(next);
+                                  }}
+                                  className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                                />
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCreateAttachments(createAttachments.filter((_, idx) => idx !== index));
+                                }}
+                                className="rounded-lg border border-transparent p-2 text-slate-400 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                          <input
+                            ref={createFileInputRef}
+                            type="file"
+                            className="hidden"
+                            multiple
+                            onChange={handleCreateFileUpload}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => createFileInputRef.current?.click()}
+                            className="flex items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-600 transition hover:border-sky-300 hover:text-sky-600"
+                          >
+                            <Paperclip className="h-4 w-4" />
+                            {t.createModal.uploadFromComputer}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCreateAttachments([...createAttachments, { name: '', url: '' }])}
+                            className="flex items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-600 transition hover:border-sky-300 hover:text-sky-600"
+                          >
+                            <PlusCircle className="h-4 w-4" />
+                            {t.createModal.addLink}
+                          </button>
+                        </div>
+                        <p className="text-xs text-slate-500">{t.createModal.attachmentHelp}</p>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-6 text-sm text-slate-500">
+                  {t.createModal.selectPrompt}
+                </div>
+              )}
             </div>
 
             {createError && <div className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-600">{createError}</div>}
@@ -1491,7 +1573,7 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !selectedType}
                 className="flex items-center gap-2 rounded-lg bg-sky-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-sky-400"
               >
                 <Send className="h-4 w-4" />
@@ -1551,10 +1633,34 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
                   <h3 className="mb-3 text-lg font-semibold text-slate-800">{t.modal.attachments}</h3>
                   {renderAttachments(selected)}
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <h3 className="mb-3 text-lg font-semibold text-slate-800">{t.modal.history}</h3>
-                  {renderAuditTrail(selected)}
-                </div>
+                {showActivity ? (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="mb-3 flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-slate-800">{t.modal.history}</h3>
+                      <button
+                        type="button"
+                        onClick={() => setShowActivity(false)}
+                        className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                      >
+                        {t.modal.hideHistory}
+                      </button>
+                    </div>
+                    {renderAuditTrail(selected)}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-5 text-center shadow-sm">
+                    <h3 className="text-lg font-semibold text-slate-700">{t.modal.history}</h3>
+                    <p className="mt-2 text-sm text-slate-500">{t.modal.historyPrompt}</p>
+                    <button
+                      type="button"
+                      onClick={() => setShowActivity(true)}
+                      className="mt-4 inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-600 transition hover:border-sky-300 hover:bg-sky-50"
+                    >
+                      <Clock3 className="h-4 w-4" />
+                      {t.modal.showHistory}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {actionMessage && <div className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{actionMessage}</div>}
@@ -1741,7 +1847,10 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
         {canCreate && (
           <button
             className="flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-200/70 transition hover:bg-sky-700"
-            onClick={() => setCreateOpen(true)}
+            onClick={() => {
+              resetCreateState();
+              setCreateOpen(true);
+            }}
           >
             <PlusCircle className="h-4 w-4" />
             {t.create}
@@ -1750,7 +1859,8 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
           {(['all', 'pending', 'sent', 'returned'] as const).map((tab) => {
             const count =
               tab === 'pending'
@@ -1776,6 +1886,17 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
               </button>
             );
           })}
+          </div>
+          <div className="relative w-full max-w-xs">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder={t.searchPlaceholder}
+              className="w-full rounded-full border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-600 shadow-sm focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-200"
+              type="search"
+            />
+          </div>
         </div>
         <div className="overflow-hidden rounded-xl border border-slate-200">
           <table className="min-w-full divide-y divide-slate-200">
