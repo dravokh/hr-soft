@@ -1,0 +1,1 @@
+export { ApplicationTypesPage } from './ApplicationTypesPage';
