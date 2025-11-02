@@ -69,9 +69,14 @@ export interface ApplicationStepSLA {
 
 export interface ApplicationTypeCapabilities {
   requiresDateRange: boolean;
+  dateRangeRequired: boolean;
   requiresTimeRange: boolean;
+  timeRangeRequired: boolean;
   hasCommentField: boolean;
+  commentRequired: boolean;
   allowsAttachments: boolean;
+  attachmentsRequired: boolean;
+  attachmentMaxSizeMb: number;
 }
 
 export interface ApplicationType {

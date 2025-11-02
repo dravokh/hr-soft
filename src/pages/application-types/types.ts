@@ -14,11 +14,7 @@ export interface SlaFormEntry {
 
 export interface FormState {
   nameKa: string;
-  nameEn: string;
   descriptionKa: string;
-  descriptionEn: string;
-  icon: string;
-  color: string;
   capabilities: ApplicationTypeCapabilities;
   flow: number[];
   sla: SlaFormEntry[];

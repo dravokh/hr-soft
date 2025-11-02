@@ -1,15 +1,6 @@
-import React from 'react';
-import { CalendarDays, Clock3, Layers3, Plane } from 'lucide-react';
 import type { ApplicationFieldDefinition, ApplicationType } from '../../types';
 import type { FormState, SlaFormEntry } from './types';
 import { DEFAULT_COMMENT_PLACEHOLDER, DEFAULT_REASON_PLACEHOLDER } from './copy';
-
-const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  CalendarDays,
-  Clock3,
-  Layers3,
-  Plane
-};
 
 export const syncSlaWithFlow = (flow: number[], current: SlaFormEntry[]): SlaFormEntry[] => {
   const existing = new Map(current.map((entry) => [entry.stepIndex, entry] as const));
@@ -25,23 +16,19 @@ export const syncSlaWithFlow = (flow: number[], current: SlaFormEntry[]): SlaFor
   });
 };
 
-export const getIconComponent = (iconName: string) => {
-  const Component = ICON_MAP[iconName];
-  return Component ?? Layers3;
-};
-
 export const buildDefaultFormState = (): FormState => ({
   nameKa: '',
-  nameEn: '',
   descriptionKa: '',
-  descriptionEn: '',
-  icon: 'Layers3',
-  color: 'bg-slate-500',
   capabilities: {
     requiresDateRange: true,
+    dateRangeRequired: true,
     requiresTimeRange: false,
+    timeRangeRequired: false,
     hasCommentField: true,
-    allowsAttachments: true
+    commentRequired: false,
+    allowsAttachments: true,
+    attachmentsRequired: false,
+    attachmentMaxSizeMb: 50
   },
   flow: [],
   sla: [],
@@ -51,11 +38,7 @@ export const buildDefaultFormState = (): FormState => ({
 export const buildFormStateFromType = (type: ApplicationType): FormState => {
   const form: FormState = {
     nameKa: type.name.ka,
-    nameEn: type.name.en,
     descriptionKa: type.description.ka,
-    descriptionEn: type.description.en,
-    icon: type.icon,
-    color: type.color,
     capabilities: { ...type.capabilities },
     flow: [...type.flow],
     sla: type.slaPerStep.map((entry) => ({
@@ -94,15 +77,15 @@ export const buildFields = (
   if (form.capabilities.requiresDateRange) {
     fields.push({
       key: 'start_date',
-      label: { ka: 'დაწყების თარიღი', en: 'Start date' },
+      label: findFieldLabel(existing, 'start_date', { ka: 'დაწყების თარიღი', en: 'Start date' }),
       type: 'date',
-      required: true
+      required: form.capabilities.dateRangeRequired
     });
     fields.push({
       key: 'end_date',
-      label: { ka: 'დასრულების თარიღი', en: 'End date' },
+      label: findFieldLabel(existing, 'end_date', { ka: 'დასრულების თარიღი', en: 'End date' }),
       type: 'date',
-      required: true
+      required: form.capabilities.dateRangeRequired
     });
   }
 
@@ -111,13 +94,13 @@ export const buildFields = (
       key: 'start_time',
       label: { ka: 'დაწყების დრო', en: 'Start time' },
       type: 'time',
-      required: false
+      required: form.capabilities.timeRangeRequired
     });
     fields.push({
       key: 'end_time',
       label: { ka: 'დასრულების დრო', en: 'End time' },
       type: 'time',
-      required: false
+      required: form.capabilities.timeRangeRequired
     });
   }
 
@@ -129,7 +112,7 @@ export const buildFields = (
         en: 'Additional comment'
       }),
       type: 'textarea',
-      required: false,
+      required: form.capabilities.commentRequired,
       placeholder: DEFAULT_COMMENT_PLACEHOLDER
     });
   }
@@ -138,10 +121,10 @@ export const buildFields = (
 };
 
 export const validateForm = (form: FormState): boolean => {
-  if (!form.nameKa.trim() || !form.nameEn.trim()) {
+  if (!form.nameKa.trim()) {
     return false;
   }
-  if (!form.descriptionKa.trim() || !form.descriptionEn.trim()) {
+  if (!form.descriptionKa.trim()) {
     return false;
   }
   if (!form.flow.length) {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock3, Layers3, PlusCircle, Save, ShieldCheck, PencilLine, Trash2 } from 'lucide-react';
+import { ChevronDown, Clock3, PlusCircle, Save, ShieldCheck, PencilLine, Trash2 } from 'lucide-react';
 import type { Role } from '../../../types';
 import type {
   ApplicationType,
@@ -8,7 +8,6 @@ import type {
   SlaFormEntry
 } from '../types';
 import type { ApplicationTypesCopy } from '../copy';
-import { getIconComponent } from '../helpers';
 
 interface ApplicationTypeEditorProps {
   language: 'ka' | 'en';
@@ -61,22 +60,23 @@ export const ApplicationTypeEditor: React.FC<ApplicationTypeEditorProps> = ({
   errorMessage,
   statusMessage
 }) => {
-  const IconPreview = getIconComponent(formState.icon);
+  const capabilityRows: Array<{
+    key: 'requiresDateRange' | 'requiresTimeRange' | 'hasCommentField' | 'allowsAttachments';
+    requiredKey: 'dateRangeRequired' | 'timeRangeRequired' | 'commentRequired' | 'attachmentsRequired';
+  }> = [
+    { key: 'requiresDateRange', requiredKey: 'dateRangeRequired' },
+    { key: 'requiresTimeRange', requiredKey: 'timeRangeRequired' },
+    { key: 'hasCommentField', requiredKey: 'commentRequired' },
+    { key: 'allowsAttachments', requiredKey: 'attachmentsRequired' }
+  ];
 
   return (
     <div className="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <span className={`flex h-14 w-14 items-center justify-center rounded-2xl text-white ${formState.color}`}>
-            <IconPreview className="h-6 w-6" />
-          </span>
-          <div>
-            <p className="text-sm uppercase tracking-wide text-slate-400">
-              {mode === 'create' ? copy.create : mode === 'edit' ? copy.edit : copy.view}
-            </p>
-            <h2 className="text-2xl font-semibold text-slate-800">{formState.nameKa || copy.title}</h2>
-          </div>
-        </div>
+      <div>
+        <p className="text-sm uppercase tracking-wide text-slate-400">
+          {mode === 'create' ? copy.create : mode === 'edit' ? copy.edit : copy.view}
+        </p>
+        <h2 className="mt-1 text-2xl font-semibold text-slate-800">{formState.nameKa || copy.title}</h2>
       </div>
 
       <section className="space-y-4">
@@ -85,7 +85,7 @@ export const ApplicationTypeEditor: React.FC<ApplicationTypeEditorProps> = ({
             {copy.basicInformation}
           </h3>
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4">
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-slate-700" htmlFor="nameKa">
               {copy.nameKa}
@@ -98,96 +98,83 @@ export const ApplicationTypeEditor: React.FC<ApplicationTypeEditorProps> = ({
             />
           </div>
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-slate-700" htmlFor="nameEn">
-              {copy.nameEn}
-            </label>
-            <input
-              id="nameEn"
-              value={formState.nameEn}
-              onChange={(event) => onFormChange((prev) => ({ ...prev, nameEn: event.target.value }))}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-slate-700" htmlFor="descriptionKa">
               {copy.descriptionKa}
             </label>
             <textarea
               id="descriptionKa"
-              rows={3}
+              rows={4}
               value={formState.descriptionKa}
               onChange={(event) => onFormChange((prev) => ({ ...prev, descriptionKa: event.target.value }))}
               className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-slate-700" htmlFor="descriptionEn">
-              {copy.descriptionEn}
-            </label>
-            <textarea
-              id="descriptionEn"
-              rows={3}
-              value={formState.descriptionEn}
-              onChange={(event) => onFormChange((prev) => ({ ...prev, descriptionEn: event.target.value }))}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-slate-700" htmlFor="icon">
-              {copy.iconLabel}
-            </label>
-            <input
-              id="icon"
-              value={formState.icon}
-              onChange={(event) => onFormChange((prev) => ({ ...prev, icon: event.target.value }))}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-slate-700" htmlFor="color">
-              {copy.colorLabel}
-            </label>
-            <input
-              id="color"
-              value={formState.color}
-              onChange={(event) => onFormChange((prev) => ({ ...prev, color: event.target.value }))}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="text-xs text-slate-400">{copy.colorHint}</p>
           </div>
         </div>
       </section>
 
       <section className="space-y-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{copy.fieldSettings}</h3>
-        <div className="grid gap-3 md:grid-cols-2">
-          {Object.entries(formState.capabilities).map(([key, value]) => (
-            <label
-              key={key}
-              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600"
-            >
-              <input
-                type="checkbox"
-                checked={Boolean(value)}
-                onChange={(event) =>
-                  onFormChange((prev) => ({
-                    ...prev,
-                    capabilities: {
-                      ...prev.capabilities,
-                      [key]: event.target.checked
+        <div className="space-y-3">
+          {capabilityRows.map((config) => {
+            const enabled = formState.capabilities[config.key];
+            const required = formState.capabilities[config.requiredKey];
+            return (
+              <div
+                key={config.key}
+                className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={enabled}
+                    onChange={(event) =>
+                      onFormChange((prev) => {
+                        const nextCapabilities = {
+                          ...prev.capabilities,
+                          [config.key]: event.target.checked
+                        } as typeof prev.capabilities;
+                        if (!event.target.checked) {
+                          nextCapabilities[config.requiredKey] = false;
+                        }
+                        return {
+                          ...prev,
+                          capabilities: nextCapabilities
+                        };
+                      })
                     }
-                  }))
-                }
-                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-              />
-              {copy.toggles[key as keyof typeof copy.toggles]}
-            </label>
-          ))}
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  {copy.toggles[config.key]}
+                </label>
+                <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500">
+                  <input
+                    type="checkbox"
+                    checked={required}
+                    disabled={!enabled}
+                    onChange={(event) =>
+                      onFormChange((prev) => ({
+                        ...prev,
+                        capabilities: {
+                          ...prev.capabilities,
+                          [config.requiredKey]: event.target.checked
+                        }
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                  />
+                  {copy.requiredLabel}
+                </label>
+              </div>
+            );
+          })}
         </div>
+        {formState.capabilities.allowsAttachments && (
+          <p className="text-xs text-slate-500">
+            {language === 'ka'
+              ? `ფაილის ზომის ლიმიტი: ${formState.capabilities.attachmentMaxSizeMb}MB`
+              : `File size limit: ${formState.capabilities.attachmentMaxSizeMb}MB`}
+          </p>
+        )}
       </section>
 
       <section className="space-y-3">
@@ -204,7 +191,7 @@ export const ApplicationTypeEditor: React.FC<ApplicationTypeEditorProps> = ({
             className="flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-left text-sm font-medium text-slate-600 shadow-sm transition hover:border-blue-200 hover:text-blue-600"
           >
             <span>{selectedRoles.length ? selectedRoles.map((role) => role.name).join(', ') : copy.selectRole}</span>
-            <Layers3 className="h-4 w-4 text-slate-400" />
+            <ChevronDown className="h-4 w-4 text-slate-400" />
           </button>
           {allowedRolesOpen && (
             <div className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-200 bg-white shadow-xl">

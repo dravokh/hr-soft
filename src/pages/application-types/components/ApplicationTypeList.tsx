@@ -3,7 +3,6 @@ import { PencilLine } from 'lucide-react';
 import type { ApplicationType } from '../../../types';
 import type { Mode } from '../types';
 import type { ApplicationTypesCopy } from '../copy';
-import { getIconComponent } from '../helpers';
 
 interface ApplicationTypeListProps {
   items: ApplicationType[];
@@ -31,8 +30,20 @@ export const ApplicationTypeList: React.FC<ApplicationTypeListProps> = ({
   return (
     <div className="space-y-3">
       {items.map((type) => {
-        const Icon = getIconComponent(type.icon);
         const active = selectedId === type.id && mode !== 'create';
+        const capabilityBadges: string[] = [];
+        if (type.capabilities.requiresDateRange) {
+          capabilityBadges.push(copy.toggles.requiresDateRange);
+        }
+        if (type.capabilities.requiresTimeRange) {
+          capabilityBadges.push(copy.toggles.requiresTimeRange);
+        }
+        if (type.capabilities.hasCommentField) {
+          capabilityBadges.push(copy.toggles.hasCommentField);
+        }
+        if (type.capabilities.allowsAttachments) {
+          capabilityBadges.push(copy.toggles.allowsAttachments);
+        }
         return (
           <button
             key={type.id}
@@ -44,18 +55,24 @@ export const ApplicationTypeList: React.FC<ApplicationTypeListProps> = ({
                 : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-slate-50'
             }`}
           >
-            <div className="flex items-start gap-3">
-              <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${type.color}`}>
-                <Icon className="h-5 w-5 text-white" />
+            <div className="flex flex-col gap-2 text-left">
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-semibold text-slate-700">{type.name.ka}</h3>
+                <PencilLine className="h-4 w-4 text-slate-400" />
               </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base font-semibold">{type.name.ka}</h3>
-                  <PencilLine className="h-4 w-4 text-slate-400" />
+              <p className="text-sm text-slate-500">{type.description.ka}</p>
+              {capabilityBadges.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {capabilityBadges.map((badge) => (
+                    <span
+                      key={badge}
+                      className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500"
+                    >
+                      {badge}
+                    </span>
+                  ))}
                 </div>
-                <p className="mt-1 text-xs uppercase tracking-wide text-slate-400">{type.name.en}</p>
-                <p className="mt-2 line-clamp-2 text-sm text-slate-500">{type.description.ka}</p>
-              </div>
+              )}
             </div>
           </button>
         );

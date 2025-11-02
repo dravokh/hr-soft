@@ -232,21 +232,41 @@ export const ApplicationTypesPage: React.FC<ApplicationTypesPageProps> = ({ lang
     });
   };
 
-  const buildPayload = (existing?: ApplicationType): Omit<ApplicationType, 'id'> => ({
-    name: { ka: formState.nameKa.trim(), en: formState.nameEn.trim() },
-    description: { ka: formState.descriptionKa.trim(), en: formState.descriptionEn.trim() },
-    icon: formState.icon.trim() || 'Layers3',
-    color: formState.color.trim() || 'bg-slate-500',
-    fields: buildFields(formState, existing),
-    flow: formState.flow.filter((roleId, index, array) => roleId && array.indexOf(roleId) === index),
-    slaPerStep: formState.sla.map((entry) => ({
-      stepIndex: entry.stepIndex,
-      seconds: Math.max(1, entry.hours) * 3600,
-      onExpire: entry.onExpire
-    })),
-    capabilities: formState.capabilities,
-    allowedRoleIds: Array.from(new Set(formState.allowedRoleIds.filter(Boolean)))
-  });
+  const buildPayload = (existing?: ApplicationType): Omit<ApplicationType, 'id'> => {
+    const nameKa = formState.nameKa.trim();
+    const descriptionKa = formState.descriptionKa.trim();
+    const fallbackIcon = existing?.icon ?? 'FileText';
+    const fallbackColor = existing?.color ?? 'bg-slate-500';
+    const capabilitySnapshot: ApplicationType['capabilities'] = {
+      ...formState.capabilities,
+      attachmentMaxSizeMb: Math.max(
+        1,
+        formState.capabilities.attachmentMaxSizeMb || existing?.capabilities.attachmentMaxSizeMb || 50
+      )
+    };
+
+    return {
+      name: {
+        ka: nameKa,
+        en: existing?.name.en?.trim().length ? existing.name.en : nameKa
+      },
+      description: {
+        ka: descriptionKa,
+        en: existing?.description.en?.trim().length ? existing.description.en : descriptionKa
+      },
+      icon: fallbackIcon,
+      color: fallbackColor,
+      fields: buildFields(formState, existing),
+      flow: formState.flow.filter((roleId, index, array) => roleId && array.indexOf(roleId) === index),
+      slaPerStep: formState.sla.map((entry) => ({
+        stepIndex: entry.stepIndex,
+        seconds: Math.max(1, entry.hours) * 3600,
+        onExpire: entry.onExpire
+      })),
+      capabilities: capabilitySnapshot,
+      allowedRoleIds: Array.from(new Set(formState.allowedRoleIds.filter(Boolean)))
+    };
+  };
 
   const handleSave = async () => {
     setErrorMessage(null);

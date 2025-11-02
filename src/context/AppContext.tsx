@@ -174,9 +174,14 @@ const FIELD_KEYS = new Set(Object.keys(FIELD_TEMPLATES));
 
 const ensureCapabilities = (capabilities?: Partial<ApplicationTypeCapabilities>): ApplicationTypeCapabilities => ({
   requiresDateRange: capabilities?.requiresDateRange ?? false,
+  dateRangeRequired: capabilities?.dateRangeRequired ?? false,
   requiresTimeRange: capabilities?.requiresTimeRange ?? false,
+  timeRangeRequired: capabilities?.timeRangeRequired ?? false,
   hasCommentField: capabilities?.hasCommentField ?? false,
-  allowsAttachments: capabilities?.allowsAttachments ?? false
+  commentRequired: capabilities?.commentRequired ?? false,
+  allowsAttachments: capabilities?.allowsAttachments ?? false,
+  attachmentsRequired: capabilities?.attachmentsRequired ?? false,
+  attachmentMaxSizeMb: capabilities?.attachmentMaxSizeMb ?? 50
 });
 
 const buildFieldsForCapabilities = (
@@ -205,17 +210,27 @@ const buildFieldsForCapabilities = (
   const fields: ApplicationFieldDefinition[] = [ensureField('reason')];
 
   if (capabilities.requiresDateRange) {
-    fields.push(ensureField('start_date'));
-    fields.push(ensureField('end_date'));
+    fields.push(
+      ensureField('start_date', { required: capabilities.dateRangeRequired ?? true })
+    );
+    fields.push(
+      ensureField('end_date', { required: capabilities.dateRangeRequired ?? true })
+    );
   }
 
   if (capabilities.requiresTimeRange) {
-    fields.push(ensureField('start_time'));
-    fields.push(ensureField('end_time'));
+    fields.push(
+      ensureField('start_time', { required: capabilities.timeRangeRequired ?? false })
+    );
+    fields.push(
+      ensureField('end_time', { required: capabilities.timeRangeRequired ?? false })
+    );
   }
 
   if (capabilities.hasCommentField) {
-    fields.push(ensureField('additional_comment'));
+    fields.push(
+      ensureField('additional_comment', { required: capabilities.commentRequired ?? false })
+    );
   }
 
   const customFields = base.filter((field) => !FIELD_KEYS.has(field.key));
@@ -321,9 +336,14 @@ const DEFAULT_APPLICATION_TYPES: ApplicationType[] = [
     ],
     capabilities: {
       requiresDateRange: true,
+      dateRangeRequired: true,
       requiresTimeRange: false,
+      timeRangeRequired: false,
       hasCommentField: true,
-      allowsAttachments: true
+      commentRequired: false,
+      allowsAttachments: true,
+      attachmentsRequired: false,
+      attachmentMaxSizeMb: 50
     },
     allowedRoleIds: [3]
   }),
@@ -396,9 +416,14 @@ const DEFAULT_APPLICATION_TYPES: ApplicationType[] = [
     ],
     capabilities: {
       requiresDateRange: true,
+      dateRangeRequired: true,
       requiresTimeRange: true,
+      timeRangeRequired: false,
       hasCommentField: true,
-      allowsAttachments: true
+      commentRequired: false,
+      allowsAttachments: true,
+      attachmentsRequired: true,
+      attachmentMaxSizeMb: 50
     },
     allowedRoleIds: [2, 3]
   })

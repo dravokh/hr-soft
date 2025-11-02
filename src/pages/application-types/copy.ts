@@ -9,12 +9,7 @@ export interface ApplicationTypesCopy {
   empty: string;
   basicInformation: string;
   nameKa: string;
-  nameEn: string;
   descriptionKa: string;
-  descriptionEn: string;
-  iconLabel: string;
-  colorLabel: string;
-  colorHint: string;
   fieldSettings: string;
   toggles: {
     requiresDateRange: string;
@@ -22,6 +17,7 @@ export interface ApplicationTypesCopy {
     hasCommentField: string;
     allowsAttachments: string;
   };
+  requiredLabel: string;
   allowedRoles: string;
   flowTitle: string;
   addStep: string;
@@ -57,20 +53,16 @@ export const COPY: Record<'ka' | 'en', ApplicationTypesCopy> = {
     view: 'ტიპის დეტალები',
     empty: 'ჯერ არცერთი განაცხადის ტიპი არ არის შექმნილი.',
     basicInformation: 'ძირითადი ინფორმაცია',
-    nameKa: 'დასახელება (ქართ.)',
-    nameEn: 'დასახელება (ინგლ.)',
-    descriptionKa: 'აღწერა (ქართ.)',
-    descriptionEn: 'აღწერა (ინგლ.)',
-    iconLabel: 'Icon (Lucide)',
-    colorLabel: 'ფერი (Tailwind კლასი)',
-    colorHint: 'მაგ: bg-sky-500, bg-emerald-500',
+    nameKa: 'დასახელება',
+    descriptionKa: 'აღწერა',
     fieldSettings: 'ველების კონფიგურაცია',
     toggles: {
-      requiresDateRange: 'საჭიროა კალენდრის დიაპაზონი',
-      requiresTimeRange: 'საჭიროა დროის დიაპაზონი',
+      requiresDateRange: 'კალენდრის დიაპაზონი',
+      requiresTimeRange: 'დროის დიაპაზონი',
       hasCommentField: 'დამატებითი კომენტარი',
-      allowsAttachments: 'ფაილების ატვირთვა (50მბ-მდე)'
+      allowsAttachments: 'ფაილის ატვირთვა (50მბ-მდე)'
     },
+    requiredLabel: 'სავალდებულო',
     allowedRoles: 'ვინ შეუძლია განაცხადის შექმნა',
     flowTitle: 'დამტკიცების მიმდევრობა',
     addStep: 'ნაბიჯის დამატება',
@@ -102,20 +94,16 @@ export const COPY: Record<'ka' | 'en', ApplicationTypesCopy> = {
     view: 'Type overview',
     empty: 'No application types have been created yet.',
     basicInformation: 'Basic information',
-    nameKa: 'Name (Georgian)',
-    nameEn: 'Name (English)',
-    descriptionKa: 'Description (Georgian)',
-    descriptionEn: 'Description (English)',
-    iconLabel: 'Icon (Lucide)',
-    colorLabel: 'Color (Tailwind class)',
-    colorHint: 'e.g. bg-sky-500, bg-emerald-500',
+    nameKa: 'Name',
+    descriptionKa: 'Description',
     fieldSettings: 'Field configuration',
     toggles: {
-      requiresDateRange: 'Require calendar range',
-      requiresTimeRange: 'Require time range',
-      hasCommentField: 'Include comment box',
-      allowsAttachments: 'Allow attachments (up to 50MB)'
+      requiresDateRange: 'Calendar range',
+      requiresTimeRange: 'Time range',
+      hasCommentField: 'Comment box',
+      allowsAttachments: 'Upload file from computer (up to 50MB)'
     },
+    requiredLabel: 'Required',
     allowedRoles: 'Who can submit this request',
     flowTitle: 'Approval flow',
     addStep: 'Add step',

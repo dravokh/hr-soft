@@ -13,7 +13,6 @@ import {
   Send,
   UserRound,
   X,
-  Plane,
   ShieldHalf
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -36,11 +35,14 @@ interface AttachmentDraft {
 const classNames = (...classes: (string | false | null | undefined)[]) =>
   classes.filter(Boolean).join(' ');
 
-const TYPE_ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
-  CalendarDays,
-  Plane,
-  ShieldHalf
-};
+const BUILTIN_FIELD_KEYS = new Set([
+  'reason',
+  'start_date',
+  'end_date',
+  'start_time',
+  'end_time',
+  'additional_comment'
+]);
 
 const BUILTIN_FIELD_KEYS = new Set([
   'reason',
@@ -572,22 +574,28 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     setCreateError(null);
     setCreateSuccess(null);
 
+    const attachmentsPayload = selectedType.capabilities.allowsAttachments
+      ? createAttachments
+          .filter((attachment) => attachment.name.trim().length > 0)
+          .map((attachment) => ({
+            name: attachment.name,
+            url: attachment.url || '#',
+            uploadedBy: currentUser.id
+          }))
+      : [];
+
+    if (selectedType.capabilities.attachmentsRequired && attachmentsPayload.length === 0) {
+      setCreateError(t.createModal.validation);
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       const values: ApplicationFieldValue[] = selectedType.fields.map((field) => ({
         applicationId: 0,
         key: field.key,
         value: createValues[field.key] ?? ''
       }));
-
-      const attachmentsPayload = selectedType.capabilities.allowsAttachments
-        ? createAttachments
-            .filter((attachment) => attachment.name.trim().length > 0)
-            .map((attachment) => ({
-              name: attachment.name,
-              url: attachment.url || '#',
-              uploadedBy: currentUser.id
-            }))
-        : [];
 
       const bundle = await createApplication({
         typeId: selectedType.id,
@@ -714,9 +722,17 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
             uploadedBy: currentUser.id
           }));
 
+        if (type.capabilities.attachmentsRequired && selected.attachments.length + attachmentsPayload.length === 0) {
+          setActionError(t.createModal.validation);
+          return;
+        }
+
         for (const attachment of attachmentsPayload) {
           await addApplicationAttachment(selected.application.id, attachment, currentUser.id);
         }
+      } else if (type.capabilities.attachmentsRequired && selected.attachments.length === 0) {
+        setActionError(t.createModal.validation);
+        return;
       }
 
       await resendApplication(
@@ -1050,8 +1066,6 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
       return null;
     }
 
-    const Icon = TYPE_ICON_MAP[selectedType.icon] ?? FileText;
-
     return (
       <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 px-4">
         <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl">
@@ -1073,7 +1087,6 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
           <form onSubmit={handleCreateSubmit} className="max-h-[75vh] overflow-y-auto px-6 py-5">
             <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
               {availableTypes.map((type) => {
-                const ActiveIcon = TYPE_ICON_MAP[type.icon] ?? FileText;
                 const isActive = type.id === selectedType.id;
                 return (
                   <button
@@ -1085,29 +1098,23 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
                       setCreateAttachments([]);
                     }}
                     className={classNames(
-                      'flex items-start gap-3 rounded-xl border px-4 py-3 text-left transition',
+                      'flex flex-col gap-1 rounded-xl border px-4 py-3 text-left transition',
                       isActive
                         ? 'border-sky-500 bg-sky-50 shadow'
                         : 'border-slate-200 hover:border-sky-200 hover:bg-slate-50'
                     )}
                   >
-                    <ActiveIcon className={classNames('h-6 w-6', isActive ? 'text-sky-600' : 'text-slate-400')} />
-                    <div>
-                      <p className="font-semibold text-slate-700">{type.name[language]}</p>
-                      <p className="text-sm text-slate-500">{type.description[language]}</p>
-                    </div>
+                    <p className="font-semibold text-slate-700">{type.name[language]}</p>
+                    <p className="text-sm text-slate-500">{type.description[language]}</p>
                   </button>
                 );
               })}
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-5">
-              <div className="mb-4 flex items-center gap-3">
-                <Icon className="h-8 w-8 text-sky-500" />
-                <div>
-                  <p className="text-lg font-semibold text-slate-800">{selectedType.name[language]}</p>
-                  <p className="text-sm text-slate-500">{t.createModal.formTitle}</p>
-                </div>
+              <div className="mb-4">
+                <p className="text-lg font-semibold text-slate-800">{selectedType.name[language]}</p>
+                <p className="text-sm text-slate-500">{t.createModal.formTitle}</p>
               </div>
               <div className="space-y-4">
                 {selectedType.fields.map((field) => (
@@ -1221,22 +1228,16 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     }
 
     const type = typeById.get(selected.application.typeId);
-    const Icon = type ? TYPE_ICON_MAP[type.icon] ?? FileText : FileText;
     const statusMeta = STATUS_META[selected.application.status];
 
     return (
       <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 px-4">
         <div className="w-full max-w-5xl rounded-3xl bg-white shadow-2xl">
           <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-                <Icon className="h-6 w-6 text-sky-600" />
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-400">{type?.name[language]}</p>
-                <h2 className="text-2xl font-bold text-slate-800">{selected.application.number}</h2>
-                <p className="text-xs text-slate-500">{formatDateTime(selected.application.createdAt, language)}</p>
-              </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-400">{type?.name[language]}</p>
+              <h2 className="text-2xl font-bold text-slate-800">{selected.application.number}</h2>
+              <p className="text-xs text-slate-500">{formatDateTime(selected.application.createdAt, language)}</p>
             </div>
             <div className="flex items-center gap-3">
               <span className={classNames('flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold', statusMeta.color)}>
@@ -1497,21 +1498,15 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
               )}
               {filteredApplications.map((bundle) => {
                 const type = typeById.get(bundle.application.typeId);
-                const Icon = type ? TYPE_ICON_MAP[type.icon] ?? FileText : FileText;
                 const requester = userById.get(bundle.application.requesterId);
                 const statusMeta = STATUS_META[bundle.application.status];
                 return (
                   <tr key={bundle.application.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3 text-sm font-semibold text-slate-700">{bundle.application.number}</td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100">
-                          <Icon className="h-5 w-5 text-sky-600" />
-                        </span>
-                        <div>
-                          <p className="font-semibold text-slate-700">{type?.name[language]}</p>
-                          <p className="text-xs text-slate-500">{type?.description[language]}</p>
-                        </div>
+                      <div>
+                        <p className="font-semibold text-slate-700">{type?.name[language]}</p>
+                        <p className="text-xs text-slate-500">{type?.description[language]}</p>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-600">{requester?.name}</td>
