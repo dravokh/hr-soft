@@ -44,6 +44,15 @@ const BUILTIN_FIELD_KEYS = new Set([
   'additional_comment'
 ]);
 
+const BUILTIN_FIELD_KEYS = new Set([
+  'reason',
+  'start_date',
+  'end_date',
+  'start_time',
+  'end_time',
+  'additional_comment'
+]);
+
 const STATUS_META: Record<
   ApplicationStatus,
   { label: { ka: string; en: string }; color: string; icon: React.ReactNode }
