@@ -222,7 +222,6 @@ const COPY: Record<
       selectType: string;
       selectPlaceholder: string;
       selectPrompt: string;
-      formTitle: string;
       submit: string;
       submitting: string;
       cancel: string;
@@ -281,7 +280,6 @@ const COPY: Record<
       selectType: 'აირჩიეთ განაცხადის ტიპი',
       selectPlaceholder: 'აირჩიეთ ტიპი…',
       selectPrompt: 'ტიპის არჩევის შემდეგ გამოჩნდება მისთვის კონფიგურირებული ველები.',
-      formTitle: 'მთავარი ინფორმაცია',
       submit: 'გაგზავნა',
       submitting: ' იგზავნება…',
       cancel: 'დახურვა',
@@ -339,7 +337,6 @@ const COPY: Record<
       selectType: 'Choose application type',
       selectPlaceholder: 'Select a type…',
       selectPrompt: 'Pick an application type to load the fields you configured for it.',
-      formTitle: 'Primary information',
       submit: 'Submit',
       submitting: 'Submitting…',
       cancel: 'Cancel',
@@ -1453,10 +1450,6 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
 
               {selectedType ? (
                 <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-5">
-                  <div className="mb-4">
-                    <p className="text-lg font-semibold text-slate-800">{selectedType.name[language]}</p>
-                    <p className="text-sm text-slate-500">{t.createModal.formTitle}</p>
-                  </div>
                   <div className="space-y-4">
                     {selectedType.fields.map((field) => (
                       <div key={field.key} className="space-y-2">
