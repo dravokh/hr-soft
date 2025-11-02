@@ -77,6 +77,22 @@ const BUILT_IN_FIELD_KEYS = new Set([
   'additional_comment'
 ]);
 
+type ApplicationFilters = {
+  query: string;
+  creatorId: number | 'all';
+  status: ApplicationStatus | 'all';
+  startDate: string;
+  endDate: string;
+};
+
+const createEmptyFilters = (): ApplicationFilters => ({
+  query: '',
+  creatorId: 'all',
+  status: 'all',
+  startDate: '',
+  endDate: ''
+});
+
 const AUDIT_ACTION_LABELS: Record<
   AuditLog['action'],
   { ka: string; en: string }
@@ -185,12 +201,27 @@ const STATUS_META: Record<
   }
 };
 
+const FILTERABLE_STATUSES: ApplicationStatus[] = ['DRAFT', 'PENDING', 'APPROVED', 'REJECTED', 'CLOSED'];
+
 const COPY: Record<
   ApplicationsPageProps['language'],
   {
     title: string;
     subtitle: string;
     searchPlaceholder: string;
+    filters: {
+      heading: string;
+      keywordLabel: string;
+      creatorLabel: string;
+      creatorPlaceholder: string;
+      statusLabel: string;
+      statusPlaceholder: string;
+      startDateLabel: string;
+      endDateLabel: string;
+      lastThirtyDays: string;
+      clear: string;
+      apply: string;
+    };
     create: string;
     tabs: { all: string; pending: string; sent: string; returned: string };
     table: { number: string; type: string; requester: string; status: string; updated: string; action: string; empty: string };
@@ -222,7 +253,6 @@ const COPY: Record<
       selectType: string;
       selectPlaceholder: string;
       selectPrompt: string;
-      formTitle: string;
       submit: string;
       submitting: string;
       cancel: string;
@@ -242,6 +272,19 @@ const COPY: Record<
     title: 'განაცხადები',
     subtitle: 'დააკვირდით დამტკიცების პროცესს, გააზიარეთ კომენტარები და მართეთ ავტომატური შეტყობინებები.',
     searchPlaceholder: 'ძიება ნომრის, ავტორის, სტატუსის ან თარიღის მიხედვით…',
+    filters: {
+      heading: 'ძიება და ფილტრები',
+      keywordLabel: 'საკვანძო სიტყვა',
+      creatorLabel: 'ავტორი',
+      creatorPlaceholder: 'ყველა ავტორი',
+      statusLabel: 'სტატუსი',
+      statusPlaceholder: 'ყველა სტატუსი',
+      startDateLabel: 'საწყისი თარიღი',
+      endDateLabel: 'საბოლოო თარიღი',
+      lastThirtyDays: 'ბოლო 30 დღე',
+      clear: 'ფილტრების გასუფთავება',
+      apply: 'ძიება'
+    },
     create: '+ ახალი განაცხადი',
     tabs: { all: 'ყველა', pending: 'მოლოდინში', sent: 'ჩემი გაგზავნილები', returned: 'უკან დაბრუნებული' },
     table: {
@@ -281,7 +324,6 @@ const COPY: Record<
       selectType: 'აირჩიეთ განაცხადის ტიპი',
       selectPlaceholder: 'აირჩიეთ ტიპი…',
       selectPrompt: 'ტიპის არჩევის შემდეგ გამოჩნდება მისთვის კონფიგურირებული ველები.',
-      formTitle: 'მთავარი ინფორმაცია',
       submit: 'გაგზავნა',
       submitting: ' იგზავნება…',
       cancel: 'დახურვა',
@@ -300,6 +342,19 @@ const COPY: Record<
     title: 'Applications',
     subtitle: 'Track approval workflows, share comments, and manage automated notifications.',
     searchPlaceholder: 'Search by number, requester, status, or date…',
+    filters: {
+      heading: 'Search & filters',
+      keywordLabel: 'Keyword',
+      creatorLabel: 'Creator',
+      creatorPlaceholder: 'All creators',
+      statusLabel: 'Status',
+      statusPlaceholder: 'All statuses',
+      startDateLabel: 'Start date',
+      endDateLabel: 'End date',
+      lastThirtyDays: 'Last 30 days',
+      clear: 'Clear filters',
+      apply: 'Search'
+    },
     create: '+ New application',
     tabs: { all: 'All', pending: 'Pending', sent: 'Sent', returned: 'Returned' },
     table: {
@@ -339,7 +394,6 @@ const COPY: Record<
       selectType: 'Choose application type',
       selectPlaceholder: 'Select a type…',
       selectPrompt: 'Pick an application type to load the fields you configured for it.',
-      formTitle: 'Primary information',
       submit: 'Submit',
       submitting: 'Submitting…',
       cancel: 'Cancel',
@@ -451,7 +505,8 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [editAttachments, setEditAttachments] = useState<AttachmentDraft[]>([]);
   const [editComment, setEditComment] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState<ApplicationFilters>(() => createEmptyFilters());
+  const [filterDraft, setFilterDraft] = useState<ApplicationFilters>(() => createEmptyFilters());
   const [showActivity, setShowActivity] = useState(false);
 
   const createFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -544,6 +599,21 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     });
   }, [accessibleApplications]);
 
+  const creatorOptions = useMemo(() => {
+    const seen = new Set<number>();
+    const options: { id: number; name: string }[] = [];
+    accessibleApplications.forEach((bundle) => {
+      const requester = userById.get(bundle.application.requesterId);
+      if (!requester || seen.has(requester.id)) {
+        return;
+      }
+      seen.add(requester.id);
+      options.push({ id: requester.id, name: requester.name });
+    });
+    const locale = language === 'ka' ? 'ka' : 'en';
+    return options.sort((a, b) => a.name.localeCompare(b.name, locale, { sensitivity: 'base' }));
+  }, [accessibleApplications, language, userById]);
+
   const filteredApplications = useMemo(() => {
     const source =
       activeTab === 'pending'
@@ -558,14 +628,42 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
       (a, b) => new Date(b.application.updatedAt).getTime() - new Date(a.application.updatedAt).getTime()
     );
 
-    const query = searchTerm.trim().toLowerCase();
-    if (!query) {
-      return sorted;
+    const { query, creatorId, status, startDate, endDate } = filters;
+    const normalizedQuery = query.trim().toLowerCase();
+
+    const start = startDate ? new Date(startDate) : null;
+    if (start) {
+      start.setHours(0, 0, 0, 0);
+    }
+    const end = endDate ? new Date(endDate) : null;
+    if (end) {
+      end.setHours(23, 59, 59, 999);
     }
 
     return sorted.filter((bundle) => {
+      if (creatorId !== 'all' && bundle.application.requesterId !== creatorId) {
+        return false;
+      }
+
+      if (status !== 'all' && bundle.application.status !== status) {
+        return false;
+      }
+
+      const createdAt = new Date(bundle.application.createdAt);
+      if (start && createdAt < start) {
+        return false;
+      }
+
+      if (end && createdAt > end) {
+        return false;
+      }
+
+      if (!normalizedQuery) {
+        return true;
+      }
+
       const number = bundle.application.number.toLowerCase();
-      if (number.includes(query)) {
+      if (number.includes(normalizedQuery)) {
         return true;
       }
 
@@ -575,23 +673,23 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
 
       const typeName = type?.name[language]?.toLowerCase() ?? '';
       const typeDescription = type?.description[language]?.toLowerCase() ?? '';
-      if (typeName.includes(query) || typeDescription.includes(query)) {
+      if (typeName.includes(normalizedQuery) || typeDescription.includes(normalizedQuery)) {
         return true;
       }
 
       const requesterName = requester?.name?.toLowerCase() ?? '';
-      if (requesterName.includes(query)) {
+      if (requesterName.includes(normalizedQuery)) {
         return true;
       }
 
       const statusLabel = statusMeta.label[language].toLowerCase();
-      if (statusLabel.includes(query) || bundle.application.status.toLowerCase().includes(query)) {
+      if (statusLabel.includes(normalizedQuery) || bundle.application.status.toLowerCase().includes(normalizedQuery)) {
         return true;
       }
 
       const created = formatDateTime(bundle.application.createdAt, language).toLowerCase();
       const updated = formatDateTime(bundle.application.updatedAt, language).toLowerCase();
-      if (created.includes(query) || updated.includes(query)) {
+      if (created.includes(normalizedQuery) || updated.includes(normalizedQuery)) {
         return true;
       }
 
@@ -600,10 +698,10 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
   }, [
     accessibleApplications,
     activeTab,
+    filters,
     language,
     pendingApplications,
     returnedApplications,
-    searchTerm,
     sentApplications,
     typeById,
     userById
@@ -641,6 +739,31 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     setCreateError(null);
     setCreateSuccess(null);
     setSelectedTypeId(null);
+  };
+
+  const handleFiltersSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setFilters({ ...filterDraft });
+  };
+
+  const handleClearFilters = () => {
+    const empty = createEmptyFilters();
+    setFilterDraft(empty);
+    setFilters(empty);
+  };
+
+  const handleLastThirtyDays = () => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 30);
+    const formatForInput = (date: Date) => date.toISOString().slice(0, 10);
+    const next = {
+      ...filterDraft,
+      startDate: formatForInput(start),
+      endDate: formatForInput(end)
+    };
+    setFilterDraft(next);
+    setFilters(next);
   };
 
   const handleCreateFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1453,10 +1576,6 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
 
               {selectedType ? (
                 <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-5">
-                  <div className="mb-4">
-                    <p className="text-lg font-semibold text-slate-800">{selectedType.name[language]}</p>
-                    <p className="text-sm text-slate-500">{t.createModal.formTitle}</p>
-                  </div>
                   <div className="space-y-4">
                     {selectedType.fields.map((field) => (
                       <div key={field.key} className="space-y-2">
@@ -1859,44 +1978,175 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="mb-4 space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-          {(['all', 'pending', 'sent', 'returned'] as const).map((tab) => {
-            const count =
-              tab === 'pending'
-                ? pendingApplications.length
-                : tab === 'sent'
-                ? sentApplications.length
-                : tab === 'returned'
-                ? returnedApplications.length
-                : accessibleApplications.length;
-            return (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={classNames(
-                  'flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition',
-                  activeTab === tab
-                    ? 'bg-sky-100 text-sky-700'
-                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                )}
-              >
-                {t.tabs[tab]}
-                <span className="rounded-full bg-white px-2 py-0.5 text-xs text-slate-500 shadow">{count}</span>
-              </button>
-            );
-          })}
+            {(['all', 'pending', 'sent', 'returned'] as const).map((tab) => {
+              const count =
+                tab === 'pending'
+                  ? pendingApplications.length
+                  : tab === 'sent'
+                  ? sentApplications.length
+                  : tab === 'returned'
+                  ? returnedApplications.length
+                  : accessibleApplications.length;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={classNames(
+                    'flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition',
+                    activeTab === tab
+                      ? 'bg-sky-100 text-sky-700'
+                      : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                  )}
+                >
+                  {t.tabs[tab]}
+                  <span className="rounded-full bg-white px-2 py-0.5 text-xs text-slate-500 shadow">{count}</span>
+                </button>
+              );
+            })}
           </div>
-          <div className="relative w-full max-w-xs">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder={t.searchPlaceholder}
-              className="w-full rounded-full border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-600 shadow-sm focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-200"
-              type="search"
-            />
-          </div>
+
+          <form
+            className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 shadow-inner"
+            onSubmit={handleFiltersSubmit}
+          >
+            <div className="flex flex-col gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t.filters.heading}</p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                <div className="xl:col-span-2">
+                  <label className="text-xs font-semibold text-slate-500" htmlFor="applications-keyword">
+                    {t.filters.keywordLabel}
+                  </label>
+                  <div className="relative mt-2">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      id="applications-keyword"
+                      value={filterDraft.query}
+                      onChange={(event) =>
+                        setFilterDraft((previous) => ({ ...previous, query: event.target.value }))
+                      }
+                      placeholder={t.searchPlaceholder}
+                      className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-700 shadow-sm focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                      type="search"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-500" htmlFor="applications-creator">
+                    {t.filters.creatorLabel}
+                  </label>
+                  <div className="mt-2">
+                    <select
+                      id="applications-creator"
+                      value={filterDraft.creatorId === 'all' ? 'all' : String(filterDraft.creatorId)}
+                      onChange={(event) =>
+                        setFilterDraft((previous) => ({
+                          ...previous,
+                          creatorId: event.target.value === 'all' ? 'all' : Number(event.target.value)
+                        }))
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                    >
+                      <option value="all">{t.filters.creatorPlaceholder}</option>
+                      {creatorOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-500" htmlFor="applications-status">
+                    {t.filters.statusLabel}
+                  </label>
+                  <div className="mt-2">
+                    <select
+                      id="applications-status"
+                      value={filterDraft.status}
+                      onChange={(event) =>
+                        setFilterDraft((previous) => ({
+                          ...previous,
+                          status: event.target.value === 'all' ? 'all' : (event.target.value as ApplicationStatus)
+                        }))
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                    >
+                      <option value="all">{t.filters.statusPlaceholder}</option>
+                      {FILTERABLE_STATUSES.map((statusKey) => (
+                        <option key={statusKey} value={statusKey}>
+                          {STATUS_META[statusKey].label[language]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-500" htmlFor="applications-start-date">
+                    {t.filters.startDateLabel}
+                  </label>
+                  <input
+                    id="applications-start-date"
+                    type="date"
+                    value={filterDraft.startDate}
+                    onChange={(event) =>
+                      setFilterDraft((previous) => ({ ...previous, startDate: event.target.value }))
+                    }
+                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-500" htmlFor="applications-end-date">
+                    {t.filters.endDateLabel}
+                  </label>
+                  <input
+                    id="applications-end-date"
+                    type="date"
+                    value={filterDraft.endDate}
+                    onChange={(event) =>
+                      setFilterDraft((previous) => ({ ...previous, endDate: event.target.value }))
+                    }
+                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleLastThirtyDays}
+                    className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm ring-1 ring-inset ring-slate-200 transition hover:text-slate-800 hover:shadow"
+                  >
+                    <CalendarDays className="h-4 w-4 text-sky-500" />
+                    {t.filters.lastThirtyDays}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearFilters}
+                    className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                  >
+                    <X className="h-4 w-4" />
+                    {t.filters.clear}
+                  </button>
+                </div>
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 via-sky-600 to-blue-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-200 transition hover:from-sky-600 hover:via-sky-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:ring-offset-1"
+                >
+                  <Search className="h-4 w-4" />
+                  {t.filters.apply}
+                </button>
+              </div>
+            </div>
+          </form>
         </div>
         <div className="overflow-hidden rounded-xl border border-slate-200">
           <table className="min-w-full divide-y divide-slate-200">
