@@ -89,7 +89,7 @@ export const buildFieldsForCapabilities = (
     };
   };
 
-  const fields: ApplicationFieldDefinition[] = [ensureField('reason')];
+  const fields: ApplicationFieldDefinition[] = [];
 
   if (capabilities.requiresDateRange) {
     fields.push(ensureField('start_date', { required: capabilities.dateRangeRequired ?? true }));
@@ -99,12 +99,6 @@ export const buildFieldsForCapabilities = (
   if (capabilities.requiresTimeRange) {
     fields.push(ensureField('start_time', { required: capabilities.timeRangeRequired ?? false }));
     fields.push(ensureField('end_time', { required: capabilities.timeRangeRequired ?? false }));
-  }
-
-  if (capabilities.hasCommentField) {
-    fields.push(
-      ensureField('additional_comment', { required: capabilities.commentRequired ?? false })
-    );
   }
 
   const customFields = base.filter((field) => !FIELD_KEYS.has(field.key));
