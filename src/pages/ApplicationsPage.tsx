@@ -890,9 +890,33 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     const printCopy = PRINT_COPY[language];
     const attachmentsHtml = selected.attachments.length
       ? selected.attachments
-          .map((attachment) => `<li>${escapeHtml(attachment.name)}</li>`)
+          .map((attachment, idx) => `
+            <div class="attachment-item">
+              <span class="attachment-number">${idx + 1}</span>
+              <span class="attachment-name">${escapeHtml(attachment.name)}</span>
+              <span class="attachment-date">${escapeHtml(formatDateTime(attachment.createdAt, language))}</span>
+            </div>
+          `)
           .join('')
-      : `<li>${escapeHtml(printCopy.noAttachments)}</li>`;
+      : `<div class="no-attachments">${language === 'ka' ? 'დანართები არ არის' : 'No attachments'}</div>`;
+
+    const auditHtml = selected.auditTrail
+      .slice()
+      .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+      .map((entry) => {
+        const actor = entry.actorId ? userById.get(entry.actorId) : null;
+        return `
+          <div class="audit-entry">
+            <div class="audit-header">
+              <span class="audit-action">${escapeHtml(entry.action)}</span>
+              <span class="audit-date">${escapeHtml(formatDateTime(entry.at, language))}</span>
+            </div>
+            <div class="audit-actor">${actor ? escapeHtml(actor.name) : '—'}</div>
+            ${entry.comment ? `<div class="audit-comment">${escapeHtml(entry.comment)}</div>` : ''}
+          </div>
+        `;
+      })
+      .join('');
 
     const html = `<!doctype html>
 <html>
@@ -900,65 +924,350 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     <meta charset="utf-8" />
     <title>${escapeHtml(selected.application.number)}</title>
     <style>
-      @page { size: A4; margin: 12mm; }
-      body { font-family: 'Inter', 'Arial', sans-serif; margin: 0; background: #f8fafc; color: #0f172a; }
-      .sheet { max-width: 190mm; margin: 0 auto; background: #ffffff; padding: 12mm; box-sizing: border-box; display: flex; flex-direction: column; gap: 10mm; }
-      .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #e2e8f0; padding-bottom: 6mm; }
-      .header h1 { font-size: 22px; margin: 0; }
-      .header .meta { text-align: right; font-size: 12px; color: #475569; }
-      .status { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #1e293b; }
-      .details { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6mm; font-size: 12px; color: #334155; }
-      .details div { line-height: 1.5; }
-      .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 2mm; }
-      .section { font-size: 12px; color: #334155; }
-      .section h2 { font-size: 13px; font-weight: 600; margin: 0 0 4mm; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; }
-      table { width: 100%; border-collapse: collapse; }
-      th, td { border: 1px solid #e2e8f0; padding: 6px 8px; font-size: 12px; text-align: left; vertical-align: top; }
-      th { width: 35%; background: #f8fafc; font-weight: 600; color: #1e293b; }
-      td { color: #334155; }
-      ul { padding-left: 18px; margin: 0; color: #334155; font-size: 12px; }
+      @media print {
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .no-print { display: none; }
+      }
+
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+
+      body {
+        font-family: 'Segoe UI', -apple-system, system-ui, sans-serif;
+        background: #f5f7fa;
+        padding: 20px;
+      }
+
+      .sheet {
+        width: 210mm;
+        min-height: 297mm;
+        background: white;
+        margin: 0 auto;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        position: relative;
+      }
+
+      .header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 40px 40px 30px 40px;
+        color: white;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .header::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -10%;
+        width: 300px;
+        height: 300px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 50%;
+      }
+
+      .header-content { position: relative; z-index: 1; }
+
+      .company-name {
+        font-size: 14px;
+        opacity: 0.9;
+        margin-bottom: 8px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+      }
+
+      .doc-title {
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+
+      .doc-number {
+        font-size: 16px;
+        opacity: 0.95;
+        font-weight: 500;
+      }
+
+      .status-badge {
+        position: absolute;
+        top: 40px;
+        right: 40px;
+        background: rgba(255,255,255,0.25);
+        backdrop-filter: blur(10px);
+        padding: 10px 20px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        border: 2px solid rgba(255,255,255,0.3);
+      }
+
+      .content {
+        padding: 40px;
+      }
+
+      .info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 25px;
+        margin-bottom: 40px;
+      }
+
+      .info-card {
+        background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%);
+        border: 1px solid #e0e7ff;
+        border-radius: 12px;
+        padding: 20px;
+        position: relative;
+      }
+
+      .info-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #6366f1;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .info-value {
+        font-size: 15px;
+        color: #1e293b;
+        font-weight: 600;
+        line-height: 1.5;
+      }
+
+      .info-sub {
+        font-size: 13px;
+        color: #64748b;
+        margin-top: 4px;
+      }
+
+      .section-title {
+        font-size: 18px;
+        color: #1e293b;
+        font-weight: 700;
+        margin-bottom: 20px;
+        padding-bottom: 12px;
+        border-bottom: 3px solid #667eea;
+        display: inline-block;
+      }
+
+      .fields-table {
+        width: 100%;
+        margin-bottom: 40px;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+      }
+
+      .fields-table tr:nth-child(even) {
+        background: #f8fafc;
+      }
+
+      .fields-table td {
+        padding: 16px 20px;
+        border-bottom: 1px solid #e2e8f0;
+      }
+
+      .fields-table tr:last-child td {
+        border-bottom: none;
+      }
+
+      .field-label {
+        font-weight: 600;
+        color: #475569;
+        width: 40%;
+        font-size: 13px;
+      }
+
+      .field-value {
+        color: #1e293b;
+        font-size: 14px;
+      }
+
+      .section {
+        margin-bottom: 40px;
+      }
+
+      .attachments-list {
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 20px;
+        border: 1px solid #e2e8f0;
+      }
+
+      .attachment-item {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 12px;
+        background: white;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        border: 1px solid #e2e8f0;
+      }
+
+      .attachment-item:last-child {
+        margin-bottom: 0;
+      }
+
+      .attachment-number {
+        width: 28px;
+        height: 28px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 600;
+        flex-shrink: 0;
+      }
+
+      .attachment-name {
+        flex: 1;
+        font-size: 14px;
+        color: #1e293b;
+        font-weight: 500;
+      }
+
+      .attachment-date {
+        font-size: 12px;
+        color: #64748b;
+      }
+
+      .no-attachments {
+        text-align: center;
+        padding: 30px;
+        color: #94a3b8;
+        font-style: italic;
+      }
+
+      .audit-trail {
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 20px;
+        border: 1px solid #e2e8f0;
+      }
+
+      .audit-entry {
+        background: white;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 12px;
+        border-left: 4px solid #667eea;
+        border: 1px solid #e2e8f0;
+        border-left: 4px solid #667eea;
+      }
+
+      .audit-entry:last-child {
+        margin-bottom: 0;
+      }
+
+      .audit-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 6px;
+      }
+
+      .audit-action {
+        font-weight: 700;
+        color: #667eea;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .audit-date {
+        font-size: 12px;
+        color: #64748b;
+      }
+
+      .audit-actor {
+        font-size: 13px;
+        color: #475569;
+        margin-bottom: 8px;
+      }
+
+      .audit-comment {
+        font-size: 13px;
+        color: #1e293b;
+        background: #f1f5f9;
+        padding: 10px;
+        border-radius: 6px;
+        margin-top: 8px;
+      }
+
+      .footer {
+        margin-top: 50px;
+        padding-top: 20px;
+        border-top: 2px solid #e2e8f0;
+        text-align: center;
+        color: #94a3b8;
+        font-size: 12px;
+      }
     </style>
   </head>
   <body>
     <div class="sheet">
       <div class="header">
-        <div>
-          <h1>${escapeHtml(type.name[language])}</h1>
-          <div class="status">${escapeHtml(statusMeta.label[language])}</div>
+        <div class="header-content">
+          <div class="company-name">${language === 'ka' ? 'HR სისტემა' : 'HR SYSTEM'}</div>
+          <div class="doc-title">${escapeHtml(type.name[language])}</div>
+          <div class="doc-number">#${escapeHtml(selected.application.number)}</div>
         </div>
-        <div class="meta">
-          <div>${escapeHtml(printCopy.created)}:</div>
-          <div>${escapeHtml(formatDateTime(selected.application.createdAt, language))}</div>
-        </div>
+        <div class="status-badge">${escapeHtml(statusMeta.label[language])}</div>
       </div>
-      <div class="details">
-        <div>
-          <div class="label">${escapeHtml(printCopy.summaryTitle)}</div>
-          <div>${escapeHtml(selected.application.number)}</div>
+
+      <div class="content">
+        <div class="info-grid">
+          <div class="info-card">
+            <div class="info-label">${language === 'ka' ? 'ავტორი' : 'REQUESTER'}</div>
+            <div class="info-value">${escapeHtml(requester?.name ?? '—')}</div>
+            <div class="info-sub">${escapeHtml(requester?.email ?? '')}</div>
+          </div>
+
+          <div class="info-card">
+            <div class="info-label">${language === 'ka' ? 'შექმნის თარიღი' : 'CREATED DATE'}</div>
+            <div class="info-value">${escapeHtml(formatDateTime(selected.application.createdAt, language))}</div>
+            ${
+              selected.application.dueAt
+                ? `<div class="info-sub">SLA: ${escapeHtml(formatDateTime(selected.application.dueAt, language))}</div>`
+                : ''
+            }
+          </div>
         </div>
-        <div>
-          <div class="label">${escapeHtml(printCopy.requester)}</div>
-          <div>${escapeHtml(requester?.name ?? '—')}</div>
+
+        <div class="section">
+          <div class="section-title">${language === 'ka' ? 'მონაცემები' : 'DETAILS'}</div>
+          <table class="fields-table">
+            ${fieldRows
+              .map(
+                (row) =>
+                  `<tr><td class="field-label">${escapeHtml(row.label)}</td><td class="field-value">${escapeHtml(row.value)}</td></tr>`
+              )
+              .join('')}
+          </table>
         </div>
-        <div>
-          <div class="label">${escapeHtml(printCopy.contact)}</div>
-          <div>${escapeHtml(requester?.email ?? '—')}</div>
+
+        <div class="section">
+          <div class="section-title">${language === 'ka' ? 'დანართები' : 'ATTACHMENTS'}</div>
+          <div class="attachments-list">
+            ${attachmentsHtml}
+          </div>
         </div>
-      </div>
-      <div class="section">
-        <h2>${escapeHtml(printCopy.fields)}</h2>
-        <table>
-          ${fieldRows
-            .map(
-              (row) =>
-                `<tr><th>${escapeHtml(row.label)}</th><td>${escapeHtml(row.value)}</td></tr>`
-            )
-            .join('')}
-        </table>
-      </div>
-      <div class="section">
-        <h2>${escapeHtml(printCopy.attachments)}</h2>
-        <ul>${attachmentsHtml}</ul>
+
+        <div class="section">
+          <div class="section-title">${language === 'ka' ? 'აქტივობის ისტორია' : 'ACTIVITY HISTORY'}</div>
+          <div class="audit-trail">
+            ${auditHtml}
+          </div>
+        </div>
+
+        <div class="footer">
+          ${language === 'ka' ? 'დოკუმენტი ავტომატურად გენერირებულია HR სისტემიდან' : 'Document automatically generated from HR System'}
+          • ${escapeHtml(new Date().toLocaleDateString(language === 'ka' ? 'ka-GE' : 'en-US'))}
+        </div>
       </div>
     </div>
   </body>
@@ -1318,34 +1627,47 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     }
 
     return (
-      <div className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-50 px-4 py-3">
-        {type.flow.map((roleId, index) => {
-          const role = roleById.get(roleId);
-          const isCompleted = index < bundle.application.currentStepIndex;
-          const isCurrent = bundle.application.status === 'PENDING' && index === bundle.application.currentStepIndex;
+      <div className="relative rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 p-6 border-2 border-slate-200 shadow-lg">
+        <div className="absolute top-3 right-3 text-xs font-bold text-slate-400 uppercase tracking-wider">
+          {language === 'ka' ? 'პროცესი' : 'WORKFLOW'}
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          {type.flow.map((roleId, index) => {
+            const role = roleById.get(roleId);
+            const isCompleted = index < bundle.application.currentStepIndex;
+            const isCurrent = bundle.application.status === 'PENDING' && index === bundle.application.currentStepIndex;
 
-          return (
-            <div key={`${bundle.application.id}-step-${roleId}`} className="flex items-center gap-2">
-              <div
-                className={classNames(
-                  'flex h-9 w-9 items-center justify-center rounded-full border text-sm font-medium',
-                  isCompleted
-                    ? 'border-emerald-500 bg-emerald-100 text-emerald-700'
-                    : isCurrent
-                    ? 'border-amber-500 bg-amber-100 text-amber-700'
-                    : 'border-slate-200 bg-white text-slate-500'
+            return (
+              <div key={`${bundle.application.id}-step-${roleId}`} className="flex items-center gap-3">
+                <div className="flex items-center gap-3 bg-white rounded-xl px-4 py-3 border-2 border-slate-200 shadow-md">
+                  <div
+                    className={classNames(
+                      'flex h-11 w-11 items-center justify-center rounded-xl text-sm font-bold shadow-lg transition-all duration-300',
+                      isCompleted
+                        ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white scale-105'
+                        : isCurrent
+                        ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white scale-105 animate-pulse'
+                        : 'bg-slate-100 text-slate-400 border-2 border-slate-300'
+                    )}
+                  >
+                    {isCompleted ? <CheckCircle2 className="h-5 w-5" /> : isCurrent ? <Clock3 className="h-5 w-5" /> : index + 1}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className={classNames('font-bold text-sm', isCompleted || isCurrent ? 'text-slate-800' : 'text-slate-500')}>
+                      {role?.name ?? 'Role'}
+                    </span>
+                    <span className="text-xs text-slate-500">{role?.description ?? ''}</span>
+                  </div>
+                </div>
+                {index < type.flow.length - 1 && (
+                  <div className="flex items-center">
+                    <ArrowLeftRight className={classNames('h-5 w-5', isCompleted ? 'text-emerald-500' : 'text-slate-300')} />
+                  </div>
                 )}
-              >
-                {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : isCurrent ? <Clock3 className="h-4 w-4" /> : index + 1}
               </div>
-              <div className="flex flex-col text-sm">
-                <span className="font-semibold text-slate-700">{role?.name ?? 'Role'}</span>
-                <span className="text-xs text-slate-500">{role?.description ?? ''}</span>
-              </div>
-              {index < type.flow.length - 1 && <ArrowLeftRight className="h-4 w-4 text-slate-300" />}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     );
   };
@@ -1382,37 +1704,72 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
   };
 
   const renderAuditTrail = (bundle: ApplicationBundle) => {
-    const sortedEntries = bundle.auditTrail
-      .slice()
-      .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
-
-    if (!sortedEntries.length) {
-      return (
-        <p className="text-sm text-slate-500">
-          {language === 'ka' ? 'ჯერჯერობით აქტივობა არ არის.' : 'No activity yet.'}
-        </p>
-      );
-    }
+    const actionColors: Record<string, { bg: string; text: string }> = {
+      CREATE: { bg: 'bg-blue-100', text: 'text-blue-700' },
+      SUBMIT: { bg: 'bg-indigo-100', text: 'text-indigo-700' },
+      APPROVE: { bg: 'bg-emerald-100', text: 'text-emerald-700' },
+      REJECT: { bg: 'bg-rose-100', text: 'text-rose-700' },
+      EDIT: { bg: 'bg-amber-100', text: 'text-amber-700' },
+      RESEND: { bg: 'bg-purple-100', text: 'text-purple-700' },
+      CLOSE: { bg: 'bg-slate-100', text: 'text-slate-700' },
+      AUTO_APPROVE: { bg: 'bg-teal-100', text: 'text-teal-700' },
+      EXPIRE_BOUNCE: { bg: 'bg-orange-100', text: 'text-orange-700' }
+    };
 
     return (
-      <ol className="space-y-3">
-        {sortedEntries.map((entry) => {
-          const actor = entry.actorId ? userById.get(entry.actorId) : null;
-          const actionLabel = AUDIT_ACTION_LABELS[entry.action]?.[language] ?? entry.action;
-          return (
-            <li key={entry.id} className="rounded-lg border border-slate-200 px-3 py-2 text-sm">
-              <div className="flex items-center justify-between">
-                <div className="font-semibold text-slate-700">
-                  {actionLabel}
-                  {actor ? ` • ${actor.name}` : ''}
+      <div className="space-y-3 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+        {bundle.auditTrail
+          .slice()
+          .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+          .map((entry, index) => {
+            const actor = entry.actorId ? userById.get(entry.actorId) : null;
+            const colors = actionColors[entry.action] || { bg: 'bg-slate-100', text: 'text-slate-700' };
+            const isRecent = index === 0;
+
+            return (
+              <div
+                key={entry.id}
+                className={classNames(
+                  'group relative rounded-xl border-2 p-4 shadow-md hover:shadow-lg transition-all duration-300',
+                  isRecent ? 'border-purple-300 bg-gradient-to-br from-purple-50 to-pink-50' : 'border-slate-200 bg-white'
+                )}
+              >
+                {isRecent && (
+                  <div className="absolute -top-2 -right-2 px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full text-white text-xs font-bold shadow-lg">
+                    {language === 'ka' ? 'ახალი' : 'NEW'}
+                  </div>
+                )}
+                <div className="flex items-start gap-3">
+                  <div className={classNames('px-3 py-1 rounded-lg font-bold text-xs uppercase shadow-md flex-shrink-0', colors.bg, colors.text)}>
+                    {entry.action}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex-1">
+                        {actor && (
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold shadow">
+                              {actor.name.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="text-sm font-semibold text-slate-700">{actor.name}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-xs text-slate-500 font-medium whitespace-nowrap">
+                        {formatDateTime(entry.at, language)}
+                      </div>
+                    </div>
+                    {entry.comment && (
+                      <div className="mt-2 p-3 rounded-lg bg-slate-50 border border-slate-200">
+                        <p className="text-sm text-slate-700 leading-relaxed">{entry.comment}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="text-xs text-slate-400">{formatDateTime(entry.at, language)}</div>
               </div>
-              {entry.comment && <p className="mt-1 text-slate-600">{entry.comment}</p>}
-            </li>
-          );
-        })}
-      </ol>
+            );
+          })}
+      </div>
     );
   };
 
@@ -1446,71 +1803,72 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     };
 
     return (
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <UserRound className="h-5 w-5 text-sky-500" />
-            <div>
-              <p className="text-xs uppercase tracking-wide text-slate-400">{t.modal.requester}</p>
-              <p className="font-semibold text-slate-700">{requester?.name ?? '—'}</p>
-              <p className="text-xs text-slate-500">{requester?.email ?? '—'}</p>
-            </div>
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+        <div className="group relative rounded-2xl bg-gradient-to-br from-sky-50 to-blue-50 p-5 shadow-lg border-2 border-sky-100 hover:border-sky-300 hover:shadow-xl transition-all duration-300">
+          <div className="absolute top-3 right-3 w-20 h-20 bg-sky-200/30 rounded-full blur-2xl"></div>
+          <div className="relative">
+            <p className="text-xs uppercase tracking-wider font-bold text-sky-600 mb-2">{t.modal.requester}</p>
+            <p className="font-bold text-slate-800 text-lg mb-1">{requester?.name ?? '—'}</p>
+            <p className="text-sm text-slate-600 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+              {requester?.email ?? '—'}
+            </p>
           </div>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <CalendarDays className="h-5 w-5 text-amber-500" />
-            <div>
-              <p className="text-xs uppercase tracking-wide text-slate-400">{t.modal.created}</p>
-              <p className="font-semibold text-slate-700">{formatDateTime(bundle.application.createdAt, language)}</p>
-              {bundle.application.dueAt && (
-                <div className="text-xs text-amber-600">
-                  <div>SLA • {formatDateTime(bundle.application.dueAt, language)}</div>
-                  <div>{formatRemainingTime(bundle.application.dueAt, language)}</div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <Clock3 className="h-5 w-5 text-indigo-500" />
-            <div>
-              <p className="text-xs uppercase tracking-wide text-slate-400">{t.modal.period}</p>
-              {(startDate || endDate) ? (
-                <p className="font-semibold text-slate-700">
-                  {formatDateSegment(startDate, startTime)} → {formatDateSegment(endDate, endTime)}
-                </p>
-              ) : (
-                <p className="font-semibold text-slate-500">—</p>
-              )}
-              {type && <p className="text-xs text-slate-500">{type.description[language]}</p>}
-            </div>
-          </div>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-start gap-3">
-            <MessageSquare className="mt-0.5 h-5 w-5 text-rose-500" />
-            <div className="space-y-2 text-sm text-slate-600">
-              {reasonValue && reasonValue.trim() && (
-                <div>
-                  <span className="text-xs uppercase tracking-wide text-slate-400">{language === 'ka' ? 'მიზანი' : 'Purpose'}</span>
-                  <p className="font-medium text-slate-700">{reasonValue}</p>
-                </div>
-              )}
-              {extraFieldEntries.map((entry) => (
-                <div key={entry.key}>
-                  <span className="text-xs uppercase tracking-wide text-slate-400">{entry.label}</span>
-                  <div className="font-medium text-slate-700">
-                    {entry.value.trim() ? entry.value : '—'}
-                  </div>
-                </div>
-              ))}
-              <div>
-                <span className="text-xs uppercase tracking-wide text-slate-400">{t.modal.comment}</span>
-                <p className="text-slate-600">{commentValue?.trim() ? commentValue : '—'}</p>
+
+        <div className="group relative rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 p-5 shadow-lg border-2 border-amber-100 hover:border-amber-300 hover:shadow-xl transition-all duration-300">
+          <div className="absolute top-3 right-3 w-20 h-20 bg-amber-200/30 rounded-full blur-2xl"></div>
+          <div className="relative">
+            <p className="text-xs uppercase tracking-wider font-bold text-amber-600 mb-2">{t.modal.created}</p>
+            <p className="font-bold text-slate-800 text-base mb-2">{formatDateTime(bundle.application.createdAt, language)}</p>
+            {bundle.application.dueAt && (
+              <div className="text-sm text-amber-700 mt-2 bg-amber-100 rounded-lg px-3 py-1.5 inline-block">
+                <div className="font-semibold">SLA: {formatDateTime(bundle.application.dueAt, language)}</div>
+                <div className="text-xs font-medium">{formatRemainingTime(bundle.application.dueAt, language)}</div>
               </div>
-            </div>
+            )}
+          </div>
+        </div>
+
+        <div className="group relative rounded-2xl bg-gradient-to-br from-indigo-50 to-purple-50 p-5 shadow-lg border-2 border-indigo-100 hover:border-indigo-300 hover:shadow-xl transition-all duration-300">
+          <div className="absolute top-3 right-3 w-20 h-20 bg-indigo-200/30 rounded-full blur-2xl"></div>
+          <div className="relative">
+            <p className="text-xs uppercase tracking-wider font-bold text-indigo-600 mb-2">{t.modal.period}</p>
+            {(startDate || endDate) ? (
+              <p className="font-bold text-slate-800 text-base leading-relaxed mb-2">
+                {formatDateSegment(startDate, startTime)} → {formatDateSegment(endDate, endTime)}
+              </p>
+            ) : (
+              <p className="font-bold text-slate-500 text-base mb-2">—</p>
+            )}
+            {type && <p className="text-xs text-slate-600 bg-indigo-100 rounded px-2 py-1 inline-block">{type.description[language]}</p>}
+          </div>
+        </div>
+
+        <div className="group relative rounded-2xl bg-gradient-to-br from-rose-50 to-pink-50 p-5 shadow-lg border-2 border-rose-100 hover:border-rose-300 hover:shadow-xl transition-all duration-300">
+          <div className="absolute top-3 right-3 w-20 h-20 bg-rose-200/30 rounded-full blur-2xl"></div>
+          <div className="relative space-y-3">
+            <p className="text-xs uppercase tracking-wider font-bold text-rose-600">{language === 'ka' ? 'დეტალები' : 'DETAILS'}</p>
+            {reasonValue && reasonValue.trim() && (
+              <div className="bg-white rounded-lg p-3 border border-rose-100">
+                <span className="text-xs uppercase tracking-wider text-rose-500 font-semibold block mb-1">{language === 'ka' ? 'მიზანი' : 'Purpose'}</span>
+                <p className="font-semibold text-slate-800 text-sm">{reasonValue}</p>
+              </div>
+            )}
+            {extraFieldEntries.map((entry) => (
+              <div key={entry.key} className="bg-white rounded-lg p-3 border border-rose-100">
+                <span className="text-xs uppercase tracking-wider text-rose-500 font-semibold block mb-1">{entry.label}</span>
+                <div className="font-semibold text-slate-800 text-sm">
+                  {entry.value.trim() ? entry.value : '—'}
+                </div>
+              </div>
+            ))}
+            {commentValue?.trim() && (
+              <div className="bg-white rounded-lg p-3 border border-rose-100">
+                <span className="text-xs uppercase tracking-wider text-rose-500 font-semibold block mb-1">{t.modal.comment}</span>
+                <p className="text-slate-700 text-sm">{commentValue}</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1714,76 +2072,88 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     const statusMeta = STATUS_META[selected.application.status];
 
     return (
-      <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 px-4">
-        <div className="w-full max-w-5xl rounded-3xl bg-white shadow-2xl">
-          <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-slate-400">{type?.name[language]}</p>
-              <h2 className="text-2xl font-bold text-slate-800">{selected.application.number}</h2>
-              <p className="text-xs text-slate-500">{formatDateTime(selected.application.createdAt, language)}</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className={classNames('flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold', statusMeta.color)}>
-                {statusMeta.icon}
-                {statusMeta.label[language]}
-              </span>
-              <button
-                type="button"
-                className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-                onClick={handlePrint}
-              >
-                <Printer className="h-5 w-5" />
-              </button>
-              <button
-                type="button"
-                className="rounded-full p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-500"
-                onClick={closeDetails}
-              >
-                <X className="h-5 w-5" />
-              </button>
+      <div className="fixed inset-0 z-40 flex items-center justify-center bg-gradient-to-br from-slate-900/80 via-purple-900/80 to-slate-900/80 backdrop-blur-sm px-4">
+        <div className="w-full max-w-6xl rounded-3xl bg-gradient-to-br from-white to-slate-50 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+          {/* Modern Header with Gradient */}
+          <div className="relative bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 px-8 py-6 overflow-hidden">
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjEiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-30"></div>
+            <div className="relative flex items-start justify-between">
+              <div className="flex-1">
+                <div className="mb-3">
+                  <p className="text-white/80 text-sm font-medium tracking-wider uppercase mb-2">{type?.name[language]}</p>
+                  <h2 className="text-4xl font-bold text-white tracking-tight">{selected.application.number}</h2>
+                </div>
+                <p className="text-white/70 text-sm">
+                  {formatDateTime(selected.application.createdAt, language)}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className={classNames('flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold bg-white/95 backdrop-blur-md shadow-lg border border-white/50', statusMeta.color)}>
+                  {statusMeta.icon}
+                  {statusMeta.label[language]}
+                </span>
+                <button
+                  type="button"
+                  className="rounded-xl p-2.5 bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-all border border-white/30 shadow-lg"
+                  onClick={handlePrint}
+                >
+                  <Printer className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl p-2.5 bg-white/20 backdrop-blur-md text-white hover:bg-rose-500 hover:bg-opacity-90 transition-all border border-white/30 shadow-lg"
+                  onClick={closeDetails}
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
           </div>
-          <div className="max-h-[75vh] overflow-y-auto px-6 py-5">
+
+          <div className="max-h-[75vh] overflow-y-auto px-8 py-6 bg-gradient-to-br from-slate-50 to-white">
             <div className="space-y-6">
-              {renderStepper(selected)}
-              {renderSummary(selected)}
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <h3 className="mb-3 text-lg font-semibold text-slate-800">{t.modal.attachments}</h3>
-                  {renderAttachments(selected)}
-                </div>
-                {showActivity ? (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="mb-3 flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-slate-800">{t.modal.history}</h3>
-                      <button
-                        type="button"
-                        onClick={() => setShowActivity(false)}
-                        className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
-                      >
-                        {t.modal.hideHistory}
-                      </button>
-                    </div>
-                    {renderAuditTrail(selected)}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-5 text-center shadow-sm">
-                    <h3 className="text-lg font-semibold text-slate-700">{t.modal.history}</h3>
-                    <p className="mt-2 text-sm text-slate-500">{t.modal.historyPrompt}</p>
-                    <button
-                      type="button"
-                      onClick={() => setShowActivity(true)}
-                      className="mt-4 inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-600 transition hover:border-sky-300 hover:bg-sky-50"
-                    >
-                      <Clock3 className="h-4 w-4" />
-                      {t.modal.showHistory}
-                    </button>
-                  </div>
-                )}
+              {/* Enhanced Stepper */}
+              <div className="relative">
+                {renderStepper(selected)}
               </div>
 
-              {actionMessage && <div className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{actionMessage}</div>}
-              {actionError && <div className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-600">{actionError}</div>}
+              {/* Summary Cards with Better Styling */}
+              {renderSummary(selected)}
+
+              {/* Attachments and History Grid */}
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <div className="group relative rounded-2xl border-2 border-slate-200 bg-white p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:border-indigo-300">
+                  <div className="absolute -top-4 left-6 px-4 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full shadow-lg">
+                    <h3 className="text-sm font-bold text-white">
+                      {t.modal.attachments}
+                    </h3>
+                  </div>
+                  <div className="mt-4">
+                    {renderAttachments(selected)}
+                  </div>
+                </div>
+                <div className="group relative rounded-2xl border-2 border-slate-200 bg-white p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:border-purple-300">
+                  <div className="absolute -top-4 left-6 px-4 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full shadow-lg">
+                    <h3 className="text-sm font-bold text-white">
+                      {t.modal.history}
+                    </h3>
+                  </div>
+                  <div className="mt-4">
+                    {renderAuditTrail(selected)}
+                  </div>
+                </div>
+              </div>
+
+              {actionMessage && (
+                <div className="rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200 px-5 py-4 text-emerald-700 font-medium shadow-lg">
+                  {actionMessage}
+                </div>
+              )}
+              {actionError && (
+                <div className="rounded-2xl bg-gradient-to-r from-rose-50 to-red-50 border-2 border-rose-200 px-5 py-4 text-rose-700 font-medium shadow-lg">
+                  {actionError}
+                </div>
+              )}
 
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="flex gap-3">
