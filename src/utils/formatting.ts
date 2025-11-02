@@ -1,43 +1,17 @@
-import { Language } from '../types';
-
 /**
  * Formatting utilities for dates, times, file sizes, and CSS classes
  * Centralized to avoid duplication across components
  */
 
-const getLocale = (language: Language): string => {
-  if (language === 'ka') {
-    return 'ka-GE';
-  }
-
-  if (language === 'tr') {
-    return 'tr-TR';
-  }
-
-  return 'en-US';
-};
-
-const getUnknownLabel = (language: Language): string => {
-  if (language === 'ka') {
-    return 'უცნობია';
-  }
-
-  if (language === 'tr') {
-    return 'Bilinmiyor';
-  }
-
-  return 'Unknown';
-};
-
 /**
  * Formats a date-time value for display
  */
-export const formatDateTime = (value: string, language: Language): string => {
+export const formatDateTime = (value: string, language: 'ka' | 'en'): string => {
   if (!value) {
-    return '—';
+    return language === 'ka' ? '—' : '—';
   }
 
-  const formatter = new Intl.DateTimeFormat(getLocale(language), {
+  const formatter = new Intl.DateTimeFormat(language === 'ka' ? 'ka-GE' : 'en-US', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -50,12 +24,12 @@ export const formatDateTime = (value: string, language: Language): string => {
 /**
  * Formats a date value (without time)
  */
-export const formatDate = (value: string, language: Language): string => {
+export const formatDate = (value: string, language: 'ka' | 'en'): string => {
   if (!value) {
-    return '—';
+    return language === 'ka' ? '—' : '—';
   }
 
-  const formatter = new Intl.DateTimeFormat(getLocale(language), {
+  const formatter = new Intl.DateTimeFormat(language === 'ka' ? 'ka-GE' : 'en-US', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit'
@@ -66,11 +40,11 @@ export const formatDate = (value: string, language: Language): string => {
 /**
  * Formats file size in bytes to human-readable format (KB/MB)
  */
-export const formatFileSize = (bytes: number, language: Language): string => {
+export const formatFileSize = (bytes: number, language: 'ka' | 'en'): string => {
   if (!Number.isFinite(bytes) || bytes <= 0) {
-    return getUnknownLabel(language);
+    return language === 'ka' ? 'უცნობია' : 'Unknown';
   }
-
+  
   const megabytes = bytes / (1024 * 1024);
   if (megabytes >= 1) {
     return `${megabytes.toFixed(1)} MB`;
@@ -83,71 +57,37 @@ export const formatFileSize = (bytes: number, language: Language): string => {
 /**
  * Calculates and formats remaining time until a due date
  */
-export const formatRemainingTime = (dueAt: string, language: Language): string => {
+export const formatRemainingTime = (dueAt: string, language: 'ka' | 'en'): string => {
   const diff = new Date(dueAt).getTime() - Date.now();
-
+  
   if (diff <= 0) {
-    if (language === 'ka') {
-      return 'ვადა ამოიწურა';
-    }
-    if (language === 'tr') {
-      return 'Süresi doldu';
-    }
-    return 'Expired';
+    return language === 'ka' ? 'ვადა ამოიწურა' : 'Expired';
   }
-
+  
   const totalMinutes = Math.round(diff / 60000);
   const days = Math.floor(totalMinutes / (60 * 24));
   const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
   const minutes = totalMinutes % 60;
-
+  
   const parts: string[] = [];
-
+  
   if (days) {
-    if (language === 'ka') {
-      parts.push(`${days} დღე`);
-    } else if (language === 'tr') {
-      parts.push(`${days} gün`);
-    } else {
-      parts.push(`${days}d`);
-    }
+    parts.push(language === 'ka' ? `${days} დღე` : `${days}d`);
   }
   if (hours) {
-    if (language === 'ka') {
-      parts.push(`${hours} სთ`);
-    } else if (language === 'tr') {
-      parts.push(`${hours} sa`);
-    } else {
-      parts.push(`${hours}h`);
-    }
+    parts.push(language === 'ka' ? `${hours} სთ` : `${hours}h`);
   }
   if (!days && minutes) {
-    if (language === 'ka') {
-      parts.push(`${minutes} წთ`);
-    } else if (language === 'tr') {
-      parts.push(`${minutes} dk`);
-    } else {
-      parts.push(`${minutes}m`);
-    }
+    parts.push(language === 'ka' ? `${minutes} წთ` : `${minutes}m`);
   }
-
+  
   if (!parts.length) {
-    if (language === 'ka') {
-      return '1 წთ-ზე ნაკლები დარჩა';
-    }
-    if (language === 'tr') {
-      return '1 dk’dan az kaldı';
-    }
-    return '<1m remaining';
+    return language === 'ka' ? '1 წთ-ზე ნაკლები დარჩა' : '<1m remaining';
   }
-
-  if (language === 'ka') {
-    return `დარჩა ${parts.join(' ')}`;
-  }
-  if (language === 'tr') {
-    return `${parts.join(' ')} kaldı`;
-  }
-  return `${parts.join(' ')} remaining`;
+  
+  return language === 'ka'
+    ? `დარჩა ${parts.join(' ')}`
+    : `${parts.join(' ')} remaining`;
 };
 
 /**

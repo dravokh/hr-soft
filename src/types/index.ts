@@ -37,12 +37,12 @@ export type ApplicationFieldType = 'text' | 'textarea' | 'date' | 'date_range' |
 
 export interface ApplicationFieldDefinition {
   key: string;
-  label: LocalizedValue<string>;
+  label: { ka: string; en: string };
   type: ApplicationFieldType;
   required: boolean;
-  placeholder?: LocalizedValue<string>;
-  options?: { value: string; label: LocalizedValue<string> }[];
-  helper?: LocalizedValue<string>;
+  placeholder?: { ka: string; en: string };
+  options?: { value: string; label: { ka: string; en: string } }[];
+  helper?: { ka: string; en: string };
   editableSteps?: number[];
 }
 
@@ -66,8 +66,8 @@ export interface ApplicationTypeCapabilities {
 
 export interface ApplicationType {
   id: number;
-  name: LocalizedValue<string>;
-  description: LocalizedValue<string>;
+  name: { ka: string; en: string };
+  description: { ka: string; en: string };
   icon: string;
   color: string;
   fields: ApplicationFieldDefinition[];
@@ -193,11 +193,3 @@ export interface AppContextValue {
   ) => Promise<ApplicationBundle | null>;
   hasPermission: (permissionId: string) => boolean;
 }
-export type Language = 'ka' | 'en' | 'tr';
-
-export type LocalizedValue<T = string> = {
-  ka: T;
-  en: T;
-  tr?: T;
-};
-

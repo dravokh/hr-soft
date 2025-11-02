@@ -1,24 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
-import {
-  AVAILABLE_LANGUAGES,
-  DEFAULT_LANGUAGE,
-  getLocalizedEntry,
-  LANGUAGE_LABELS,
-  LocalizedMap
-} from '../../utils/i18n';
-import { Language } from '../../types';
 
-const translations: LocalizedMap<{
-  title: string;
-  subtitle: string;
-  email: string;
-  password: string;
-  loginButton: string;
-  loggingIn: string;
-  demoAccounts: string;
-}> = {
+const translations = {
   ka: {
     title: 'HR მართვა',
     subtitle: 'შედით თქვენს ანგარიშში',
@@ -36,40 +20,27 @@ const translations: LocalizedMap<{
     loginButton: 'Login',
     loggingIn: 'Logging in...',
     demoAccounts: 'Demo Accounts:'
-  },
-  tr: {
-    title: 'İK Yönetimi',
-    subtitle: 'Hesabınıza giriş yapın',
-    email: 'E-posta',
-    password: 'Parola',
-    loginButton: 'Giriş yap',
-    loggingIn: 'Giriş yapılıyor...',
-    demoAccounts: 'Demo Hesapları:'
   }
 };
 
-const REQUIRED_FIELDS_ERROR: LocalizedMap<string> = {
-  ka: 'შეავსეთ ყველა ველი',
-  en: 'Please fill all fields',
-  tr: 'Lütfen tüm alanları doldurun'
-};
+type Language = keyof typeof translations;
 
 export const LoginView: React.FC = () => {
   const { login } = useAppContext();
-  const [language, setLanguage] = useState<Language>(DEFAULT_LANGUAGE);
+  const [language, setLanguage] = useState<Language>('ka');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const t = useMemo(() => getLocalizedEntry(translations, language), [language]);
+  const t = useMemo(() => translations[language], [language]);
 
   const handleSubmit = async () => {
     setError('');
 
     if (!email || !password) {
-      setError(getLocalizedEntry(REQUIRED_FIELDS_ERROR, language));
+      setError(language === 'ka' ? 'შეავსეთ ყველა ველი' : 'Please fill all fields');
       return;
     }
 
@@ -86,24 +57,26 @@ export const LoginView: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-2xl p-8">
-          {AVAILABLE_LANGUAGES.length > 1 && (
-            <div className="flex justify-end gap-2 mb-6">
-              {AVAILABLE_LANGUAGES.map((languageCode) => (
-                <button
-                  key={languageCode}
-                  type="button"
-                  onClick={() => setLanguage(languageCode)}
-                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${
-                    language === languageCode
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {LANGUAGE_LABELS[languageCode]}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="flex justify-end gap-2 mb-6">
+            <button
+              type="button"
+              onClick={() => setLanguage('ka')}
+              className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${
+                language === 'ka' ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              ქართული
+            </button>
+            <button
+              type="button"
+              onClick={() => setLanguage('en')}
+              className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${
+                language === 'en' ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              English
+            </button>
+          </div>
 
           <div className="text-center mb-8">
             <div className="w-20 h-20 bg-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-4">

@@ -1,2 +1,0 @@
-export const LANGUAGE_SWITCH_FEATURE_ENABLED = false;
-
