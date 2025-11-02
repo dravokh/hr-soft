@@ -50,6 +50,9 @@ const COPY: Record<RolesPageProps['language'], {
   permissionCount: (count: number) => string;
   systemBadge: string;
   customBadge: string;
+  selectRoleLabel: string;
+  selectRolePlaceholder: string;
+  noRoleSelected: string;
 }> = {
   ka: {
     title: 'როლების მართვა',
@@ -91,7 +94,10 @@ const COPY: Record<RolesPageProps['language'], {
       return `${count} უფლება`;
     },
     systemBadge: 'სისტემური',
-    customBadge: 'მორგებული'
+    customBadge: 'მორგებული',
+    selectRoleLabel: 'აირჩიეთ როლი',
+    selectRolePlaceholder: 'აირჩიეთ როლი სიიდან…',
+    noRoleSelected: 'აირჩიეთ როლი ჩამოსაშლელიდან ან შექმენით ახალი.'
   },
   en: {
     title: 'Role management',
@@ -133,7 +139,10 @@ const COPY: Record<RolesPageProps['language'], {
       return `${count} permissions`;
     },
     systemBadge: 'System',
-    customBadge: 'Custom'
+    customBadge: 'Custom',
+    selectRoleLabel: 'Choose a role',
+    selectRolePlaceholder: 'Select a role…',
+    noRoleSelected: 'Pick a role from the dropdown or create a new one.'
   }
 };
 
@@ -613,81 +622,63 @@ export const RolesPage: React.FC<RolesPageProps> = ({ language }) => {
         </button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
+      <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
         <div className="space-y-4">
-          {roles.map((role) => {
-            const isActive = role.id === selectedRoleId;
-            const assignments = users.filter((user) => user.roleId === role.id).length;
-            const badgeLabel = role.id === 1 ? t.systemBadge : t.customBadge;
-            return (
-              <button
-                type="button"
-                key={role.id}
-                onClick={() => {
-                  setSelectedRoleId(role.id);
-                  setMode('view');
-                  setErrorMessage(null);
-                  setStatusMessage(null);
-                }}
-                className={`w-full text-left rounded-2xl border p-6 transition shadow-sm ${
-                  isActive ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-200'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-base font-semibold text-slate-800">{role.name}</h3>
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                          role.id === 1 ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        <BadgeCheck className="w-3.5 h-3.5" />
-                        {badgeLabel}
-                      </span>
-                    </div>
-                    <p className="text-sm text-slate-500 leading-relaxed">{role.description}</p>
-                    <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500">
-                      <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 border border-slate-200">
-                        <UsersIcon className="w-3.5 h-3.5 text-blue-500" />
-                        {t.membersLabel(assignments)}
-                      </span>
-                      <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 border border-slate-200">
-                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                        {t.permissionCount(role.permissions.length)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    {canEdit && (
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          startEdit(role);
-                        }}
-                        className="rounded-full border border-slate-200 bg-white p-2 text-slate-500 hover:text-blue-600 hover:border-blue-200"
-                      >
-                        <PencilLine className="w-4 h-4" />
-                      </button>
-                    )}
-                    {canDelete && role.id !== 1 && (
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void handleDelete(role);
-                        }}
-                        className="rounded-full border border-slate-200 bg-white p-2 text-rose-500 hover:text-rose-600 hover:border-rose-200"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-slate-700">{t.selectRoleLabel}</label>
+            <select
+              value={selectedRoleId ?? ''}
+              onChange={(event) => {
+                const value = event.target.value;
+                setErrorMessage(null);
+                setStatusMessage(null);
+                if (!value) {
+                  setSelectedRoleId(null);
+                  if (mode !== 'create') {
+                    setMode('view');
+                  }
+                  return;
+                }
+                setSelectedRoleId(Number(value));
+                setMode('view');
+              }}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">{t.selectRolePlaceholder}</option>
+              {roles.map((role) => (
+                <option key={role.id} value={role.id}>
+                  {role.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          {mode !== 'create' && !selectedRole && (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+              {t.noRoleSelected}
+            </div>
+          )}
+          {selectedRole && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-semibold text-slate-800">{selectedRole.name}</h3>
+                  <p className="mt-1 text-sm text-slate-500">{selectedRole.description}</p>
                 </div>
-              </button>
-            );
-          })}
+                <span
+                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+                    selectedRole.id === 1 ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  <BadgeCheck className="h-3.5 w-3.5" />
+                  {selectedRole.id === 1 ? t.systemBadge : t.customBadge}
+                </span>
+              </div>
+              <div className="mt-4 space-y-2 text-xs text-slate-500">
+                <div>{t.membersLabel(users.filter((user) => user.roleId === selectedRole.id).length)}</div>
+                <div>{t.permissionCount(selectedRole.permissions.length)}</div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm p-8">
