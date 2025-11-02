@@ -48,7 +48,7 @@ export type ApplicationAction =
   | 'AUTO_APPROVE'
   | 'EXPIRE_BOUNCE';
 
-export type ApplicationFieldType = 'text' | 'textarea' | 'date' | 'date_range' | 'select' | 'number';
+export type ApplicationFieldType = 'text' | 'textarea' | 'date' | 'date_range' | 'select' | 'number' | 'time';
 
 export interface ApplicationFieldDefinition {
   key: string;
@@ -67,6 +67,13 @@ export interface ApplicationStepSLA {
   onExpire: 'AUTO_APPROVE' | 'BOUNCE_BACK';
 }
 
+export interface ApplicationTypeCapabilities {
+  requiresDateRange: boolean;
+  requiresTimeRange: boolean;
+  hasCommentField: boolean;
+  allowsAttachments: boolean;
+}
+
 export interface ApplicationType {
   id: number;
   name: { ka: string; en: string };
@@ -76,6 +83,8 @@ export interface ApplicationType {
   fields: ApplicationFieldDefinition[];
   flow: number[];
   slaPerStep: ApplicationStepSLA[];
+  capabilities: ApplicationTypeCapabilities;
+  allowedRoleIds: number[];
 }
 
 export interface Application {
@@ -155,7 +164,16 @@ export interface AppContextValue {
   saveRoles: (roles: Role[]) => Promise<void>;
   saveUsers: (users: User[]) => Promise<void>;
   saveTickets: (tickets: Ticket[]) => Promise<void>;
-  saveApplications: (applications: ApplicationBundle[]) => Promise<void>;
+  saveApplications: (
+    applications: ApplicationBundle[] | ((current: ApplicationBundle[]) => ApplicationBundle[])
+  ) => Promise<ApplicationBundle[]>;
+  saveApplicationTypes: (
+    types: ApplicationType[],
+    applicationUpdater?: (current: ApplicationBundle[]) => ApplicationBundle[]
+  ) => Promise<void>;
+  createApplicationType: (payload: Omit<ApplicationType, 'id'>) => Promise<ApplicationType>;
+  updateApplicationType: (payload: ApplicationType) => Promise<ApplicationType | null>;
+  deleteApplicationType: (typeId: number) => Promise<boolean>;
   createApplication: (
     payload: Omit<Application, 'id' | 'number' | 'status' | 'currentStepIndex' | 'createdAt' | 'updatedAt' | 'submittedAt' | 'dueAt'> & {
       values: ApplicationFieldValue[];
