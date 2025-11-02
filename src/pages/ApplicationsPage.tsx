@@ -20,7 +20,8 @@ import {
   ApplicationBundle,
   ApplicationFieldDefinition,
   ApplicationFieldValue,
-  ApplicationStatus
+  ApplicationStatus,
+  AuditLog
 } from '../types';
 
 interface ApplicationsPageProps {
@@ -74,6 +75,83 @@ const BUILT_IN_FIELD_KEYS = new Set([
   'end_time',
   'additional_comment'
 ]);
+
+const AUDIT_ACTION_LABELS: Record<
+  AuditLog['action'],
+  { ka: string; en: string }
+> = {
+  CREATE: {
+    ka: 'განაცხადი შეიქმნა',
+    en: 'Application created'
+  },
+  SUBMIT: {
+    ka: 'გაგზავნილია დამტკიცებისთვის',
+    en: 'Submitted for approval'
+  },
+  APPROVE: {
+    ka: 'დამტკიცდა',
+    en: 'Approved'
+  },
+  REJECT: {
+    ka: 'დაუბრუნდა შესწორებისთვის',
+    en: 'Returned for changes'
+  },
+  EDIT: {
+    ka: 'ინფორმაცია განახლდა',
+    en: 'Details updated'
+  },
+  RESEND: {
+    ka: 'ხელახლა გადაიგზავნა დამტკიცებაზე',
+    en: 'Resent to approvers'
+  },
+  CLOSE: {
+    ka: 'განაცხადი დაიხურა',
+    en: 'Application closed'
+  },
+  AUTO_APPROVE: {
+    ka: 'ავტომატურად დამტკიცდა',
+    en: 'Automatically approved'
+  },
+  EXPIRE_BOUNCE: {
+    ka: 'დაუბრუნდა SLA-ს ვადის გასვლის გამო',
+    en: 'Returned after SLA expiration'
+  }
+};
+
+const PRINT_COPY: Record<
+  ApplicationsPageProps['language'],
+  {
+    summaryTitle: string;
+    requester: string;
+    contact: string;
+    status: string;
+    created: string;
+    fields: string;
+    attachments: string;
+    noAttachments: string;
+  }
+> = {
+  ka: {
+    summaryTitle: 'განაცხადის შეჯამება',
+    requester: 'ავტორი',
+    contact: 'კონტაქტი',
+    status: 'სტატუსი',
+    created: 'შექმნის დრო',
+    fields: 'განაცხადის დეტალები',
+    attachments: 'დანართები',
+    noAttachments: 'დანართები არ არის'
+  },
+  en: {
+    summaryTitle: 'Application summary',
+    requester: 'Requester',
+    contact: 'Contact',
+    status: 'Status',
+    created: 'Created at',
+    fields: 'Application details',
+    attachments: 'Attachments',
+    noAttachments: 'No attachments'
+  }
+};
 
 const STATUS_META: Record<
   ApplicationStatus,
@@ -612,11 +690,12 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 
+    const printCopy = PRINT_COPY[language];
     const attachmentsHtml = selected.attachments.length
       ? selected.attachments
           .map((attachment) => `<li>${escapeHtml(attachment.name)}</li>`)
           .join('')
-      : `<li>${language === 'ka' ? 'ფაილი არ არის' : 'No attachments'}</li>`;
+      : `<li>${escapeHtml(printCopy.noAttachments)}</li>`;
 
     const html = `<!doctype html>
 <html>
@@ -624,52 +703,66 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     <meta charset="utf-8" />
     <title>${escapeHtml(selected.application.number)}</title>
     <style>
-      body { font-family: 'Arial', sans-serif; margin: 0; background: #f1f5f9; }
-      .sheet { width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff; padding: 20mm; box-sizing: border-box; }
-      h1 { font-size: 22px; margin-bottom: 4mm; }
-      h2 { font-size: 16px; margin: 10mm 0 4mm; }
-      table { width: 100%; border-collapse: collapse; margin-top: 6mm; }
-      th, td { border: 1px solid #d1d5db; padding: 6px 8px; font-size: 12px; text-align: left; }
-      th { width: 35%; background: #f8fafc; }
-      .meta { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 8mm; }
-      .meta div { line-height: 1.6; }
-      .status { font-weight: bold; color: #0f172a; }
-      ul { padding-left: 18px; font-size: 12px; }
+      @page { size: A4; margin: 12mm; }
+      body { font-family: 'Inter', 'Arial', sans-serif; margin: 0; background: #f8fafc; color: #0f172a; }
+      .sheet { max-width: 190mm; margin: 0 auto; background: #ffffff; padding: 12mm; box-sizing: border-box; display: flex; flex-direction: column; gap: 10mm; }
+      .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #e2e8f0; padding-bottom: 6mm; }
+      .header h1 { font-size: 22px; margin: 0; }
+      .header .meta { text-align: right; font-size: 12px; color: #475569; }
+      .status { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #1e293b; }
+      .details { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6mm; font-size: 12px; color: #334155; }
+      .details div { line-height: 1.5; }
+      .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 2mm; }
+      .section { font-size: 12px; color: #334155; }
+      .section h2 { font-size: 13px; font-weight: 600; margin: 0 0 4mm; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { border: 1px solid #e2e8f0; padding: 6px 8px; font-size: 12px; text-align: left; vertical-align: top; }
+      th { width: 35%; background: #f8fafc; font-weight: 600; color: #1e293b; }
+      td { color: #334155; }
+      ul { padding-left: 18px; margin: 0; color: #334155; font-size: 12px; }
     </style>
   </head>
   <body>
     <div class="sheet">
-      <h1>${escapeHtml(type.name[language])}</h1>
-      <div class="meta">
+      <div class="header">
         <div>
-          <div>${escapeHtml(selected.application.number)}</div>
-          <div>${escapeHtml(statusMeta.label[language])}</div>
+          <h1>${escapeHtml(type.name[language])}</h1>
+          <div class="status">${escapeHtml(statusMeta.label[language])}</div>
         </div>
-        <div>
-          <div>${escapeHtml(requester?.name ?? '—')}</div>
-          <div>${escapeHtml(requester?.email ?? '')}</div>
-        </div>
-        <div style="text-align:right;">
+        <div class="meta">
+          <div>${escapeHtml(printCopy.created)}:</div>
           <div>${escapeHtml(formatDateTime(selected.application.createdAt, language))}</div>
-          ${
-            selected.application.dueAt
-              ? `<div>${escapeHtml(formatDateTime(selected.application.dueAt, language))}</div><div>${escapeHtml(
-                  formatRemainingTime(selected.application.dueAt, language)
-                )}</div>`
-              : ''
-          }
         </div>
       </div>
-      <table>
-        ${fieldRows
-          .map(
-            (row) =>
-              `<tr><th>${escapeHtml(row.label)}</th><td>${escapeHtml(row.value)}</td></tr>`
-          )
-          .join('')}
-      </table>
-      <h2>${language === 'ka' ? 'დანართები' : 'Attachments'}</h2>
-      <ul>${attachmentsHtml}</ul>
+      <div class="details">
+        <div>
+          <div class="label">${escapeHtml(printCopy.summaryTitle)}</div>
+          <div>${escapeHtml(selected.application.number)}</div>
+        </div>
+        <div>
+          <div class="label">${escapeHtml(printCopy.requester)}</div>
+          <div>${escapeHtml(requester?.name ?? '—')}</div>
+        </div>
+        <div>
+          <div class="label">${escapeHtml(printCopy.contact)}</div>
+          <div>${escapeHtml(requester?.email ?? '—')}</div>
+        </div>
+      </div>
+      <div class="section">
+        <h2>${escapeHtml(printCopy.fields)}</h2>
+        <table>
+          ${fieldRows
+            .map(
+              (row) =>
+                `<tr><th>${escapeHtml(row.label)}</th><td>${escapeHtml(row.value)}</td></tr>`
+            )
+            .join('')}
+        </table>
+      </div>
+      <div class="section">
+        <h2>${escapeHtml(printCopy.attachments)}</h2>
+        <ul>${attachmentsHtml}</ul>
+      </div>
     </div>
   </body>
 </html>`;
@@ -1088,26 +1181,36 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
   };
 
   const renderAuditTrail = (bundle: ApplicationBundle) => {
+    const sortedEntries = bundle.auditTrail
+      .slice()
+      .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+
+    if (!sortedEntries.length) {
+      return (
+        <p className="text-sm text-slate-500">
+          {language === 'ka' ? 'ჯერჯერობით აქტივობა არ არის.' : 'No activity yet.'}
+        </p>
+      );
+    }
+
     return (
       <ol className="space-y-3">
-        {bundle.auditTrail
-          .slice()
-          .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
-          .map((entry) => {
-            const actor = entry.actorId ? userById.get(entry.actorId) : null;
-            return (
-              <li key={entry.id} className="rounded-lg border border-slate-200 px-3 py-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <div className="font-semibold text-slate-700">
-                    {entry.action}
-                    {actor ? ` • ${actor.name}` : ''}
-                  </div>
-                  <div className="text-xs text-slate-400">{formatDateTime(entry.at, language)}</div>
+        {sortedEntries.map((entry) => {
+          const actor = entry.actorId ? userById.get(entry.actorId) : null;
+          const actionLabel = AUDIT_ACTION_LABELS[entry.action]?.[language] ?? entry.action;
+          return (
+            <li key={entry.id} className="rounded-lg border border-slate-200 px-3 py-2 text-sm">
+              <div className="flex items-center justify-between">
+                <div className="font-semibold text-slate-700">
+                  {actionLabel}
+                  {actor ? ` • ${actor.name}` : ''}
                 </div>
-                {entry.comment && <p className="mt-1 text-slate-600">{entry.comment}</p>}
-              </li>
-            );
-          })}
+                <div className="text-xs text-slate-400">{formatDateTime(entry.at, language)}</div>
+              </div>
+              {entry.comment && <p className="mt-1 text-slate-600">{entry.comment}</p>}
+            </li>
+          );
+        })}
       </ol>
     );
   };
