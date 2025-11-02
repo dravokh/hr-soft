@@ -48,3 +48,30 @@ body {
 .animate-in {
   animation: fade-in 0.3s ease-out, zoom-in 0.3s ease-out;
 }
+
+/* Print Styles */
+@media print {
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Hide everything except print content */
+  body > *:not(.print-container) {
+    display: none !important;
+  }
+
+  /* Ensure print content is visible */
+  .print\:block {
+    display: block !important;
+  }
+
+  .print\:hidden {
+    display: none !important;
+  }
+}
