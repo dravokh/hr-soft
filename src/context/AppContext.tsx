@@ -8,10 +8,13 @@ import {
   User,
   ApplicationBundle,
   ApplicationType,
+  ApplicationTypeCapabilities,
+  ApplicationFieldDefinition,
   ApplicationFieldValue,
   Attachment,
   AuditLog,
-  Application
+  Application,
+  ApplicationStepSLA
 } from '../types';
 import { ALL_PERMISSIONS } from '../constants/permissions';
 import { storage } from '../utils/storage';
@@ -43,7 +46,8 @@ const DEFAULT_ROLES: Role[] = [
       'approve_requests',
       'view_tickets',
       'update_tickets',
-      'set_ticket_priority'
+      'set_ticket_priority',
+      'manage_request_types'
     ]
   },
   {
@@ -122,12 +126,167 @@ const DEFAULT_TICKETS: Ticket[] = [
   }
 ];
 
+const FIELD_TEMPLATES: Record<
+  'reason' | 'start_date' | 'end_date' | 'start_time' | 'end_time' | 'additional_comment',
+  ApplicationFieldDefinition
+> = {
+  reason: {
+    key: 'reason',
+    label: { ka: 'მიზანი', en: 'Purpose' },
+    type: 'textarea',
+    required: true,
+    placeholder: { ka: 'მოკლედ აღწერეთ განაცხადის მიზეზი…', en: 'Describe why you are submitting this request…' }
+  },
+  start_date: {
+    key: 'start_date',
+    label: { ka: 'დაწყების თარიღი', en: 'Start date' },
+    type: 'date',
+    required: true
+  },
+  end_date: {
+    key: 'end_date',
+    label: { ka: 'დასრულების თარიღი', en: 'End date' },
+    type: 'date',
+    required: true
+  },
+  start_time: {
+    key: 'start_time',
+    label: { ka: 'დაწყების დრო', en: 'Start time' },
+    type: 'time',
+    required: false
+  },
+  end_time: {
+    key: 'end_time',
+    label: { ka: 'დასრულების დრო', en: 'End time' },
+    type: 'time',
+    required: false
+  },
+  additional_comment: {
+    key: 'additional_comment',
+    label: { ka: 'დამატებითი კომენტარი', en: 'Additional comment' },
+    type: 'textarea',
+    required: false,
+    placeholder: { ka: 'მიუთითეთ დამატებითი ინფორმაცია…', en: 'Provide any extra context…' }
+  }
+};
+
+const FIELD_KEYS = new Set(Object.keys(FIELD_TEMPLATES));
+
+const ensureCapabilities = (capabilities?: Partial<ApplicationTypeCapabilities>): ApplicationTypeCapabilities => ({
+  requiresDateRange: capabilities?.requiresDateRange ?? false,
+  dateRangeRequired: capabilities?.dateRangeRequired ?? false,
+  requiresTimeRange: capabilities?.requiresTimeRange ?? false,
+  timeRangeRequired: capabilities?.timeRangeRequired ?? false,
+  hasCommentField: capabilities?.hasCommentField ?? false,
+  commentRequired: capabilities?.commentRequired ?? false,
+  allowsAttachments: capabilities?.allowsAttachments ?? false,
+  attachmentsRequired: capabilities?.attachmentsRequired ?? false,
+  attachmentMaxSizeMb: capabilities?.attachmentMaxSizeMb ?? 50
+});
+
+const buildFieldsForCapabilities = (
+  existing: ApplicationFieldDefinition[] | undefined,
+  capabilities: ApplicationTypeCapabilities
+): ApplicationFieldDefinition[] => {
+  const base = existing ?? [];
+  const byKey = new Map(base.map((field) => [field.key, field] as const));
+
+  const ensureField = (
+    key: keyof typeof FIELD_TEMPLATES,
+    overrides?: Partial<ApplicationFieldDefinition>
+  ): ApplicationFieldDefinition => {
+    const template = FIELD_TEMPLATES[key];
+    const current = byKey.get(key);
+    return {
+      ...template,
+      ...(current ?? {}),
+      ...(overrides ?? {}),
+      key,
+      type: template.type,
+      required: overrides?.required ?? current?.required ?? template.required
+    };
+  };
+
+  const fields: ApplicationFieldDefinition[] = [ensureField('reason')];
+
+  if (capabilities.requiresDateRange) {
+    fields.push(
+      ensureField('start_date', { required: capabilities.dateRangeRequired ?? true })
+    );
+    fields.push(
+      ensureField('end_date', { required: capabilities.dateRangeRequired ?? true })
+    );
+  }
+
+  if (capabilities.requiresTimeRange) {
+    fields.push(
+      ensureField('start_time', { required: capabilities.timeRangeRequired ?? false })
+    );
+    fields.push(
+      ensureField('end_time', { required: capabilities.timeRangeRequired ?? false })
+    );
+  }
+
+  if (capabilities.hasCommentField) {
+    fields.push(
+      ensureField('additional_comment', { required: capabilities.commentRequired ?? false })
+    );
+  }
+
+  const customFields = base.filter((field) => !FIELD_KEYS.has(field.key));
+  const seen = new Set(fields.map((field) => field.key));
+  for (const field of customFields) {
+    if (seen.has(field.key)) {
+      continue;
+    }
+    fields.push(field);
+    seen.add(field.key);
+  }
+
+  return fields;
+};
+
+const normalizeApplicationType = (type: ApplicationType): ApplicationType => {
+  const capabilities = ensureCapabilities(type.capabilities);
+  const allowedRoleIds = Array.from(new Set(type.allowedRoleIds ?? [])).filter((id) => Number.isFinite(id));
+  const fields = buildFieldsForCapabilities(type.fields, capabilities);
+
+  const flow = type.flow.filter((roleId, index, array) => roleId && array.indexOf(roleId) === index);
+  const slaPerStep: ApplicationStepSLA[] = (Array.isArray(type.slaPerStep) ? type.slaPerStep : []).reduce<
+    ApplicationStepSLA[]
+  >((accumulator, entry) => {
+    const normalized: ApplicationStepSLA = {
+      stepIndex: Math.max(0, Math.min(entry.stepIndex, flow.length ? flow.length - 1 : 0)),
+      seconds: entry.seconds > 0 ? entry.seconds : 0,
+      onExpire: entry.onExpire === 'BOUNCE_BACK' ? 'BOUNCE_BACK' : 'AUTO_APPROVE'
+    };
+
+    if (flow[normalized.stepIndex] !== undefined) {
+      accumulator.push(normalized);
+    }
+
+    return accumulator;
+  }, []);
+
+  return {
+    ...type,
+    capabilities,
+    allowedRoleIds,
+    fields,
+    flow,
+    slaPerStep
+  };
+};
+
+const normalizeApplicationTypeList = (types: ApplicationType[]): ApplicationType[] =>
+  types.map((type) => normalizeApplicationType(type));
+
 const DEFAULT_APPLICATION_TYPES: ApplicationType[] = [
-  {
+  normalizeApplicationType({
     id: 1,
     name: { ka: 'შვებულების განაცხადი', en: 'Leave request' },
     description: {
-      ka: 'დაგეგმილი ან უცაბედი შვებულებების დამტკიცების სამუშაო პრക്രესი.',
+      ka: 'დაგეგმილი ან უცაბედი შვებულებების დამტკიცების სამუშაო პროცესი.',
       en: 'Approval workflow for planned or urgent leave requests.'
     },
     icon: 'CalendarDays',
@@ -135,7 +294,7 @@ const DEFAULT_APPLICATION_TYPES: ApplicationType[] = [
     fields: [
       {
         key: 'reason',
-        label: { ka: 'შვებულების მიზეზი', en: 'Reason for leave' },
+        label: { ka: 'შვებულების მიზეზი', en: 'Leave reason' },
         type: 'textarea',
         required: true,
         placeholder: { ka: 'მოკლედ აღწერეთ მიზეზი…', en: 'Describe the reason…' }
@@ -174,9 +333,21 @@ const DEFAULT_APPLICATION_TYPES: ApplicationType[] = [
     slaPerStep: [
       { stepIndex: 0, seconds: 48 * 3600, onExpire: 'AUTO_APPROVE' },
       { stepIndex: 1, seconds: 72 * 3600, onExpire: 'BOUNCE_BACK' }
-    ]
-  },
-  {
+    ],
+    capabilities: {
+      requiresDateRange: true,
+      dateRangeRequired: true,
+      requiresTimeRange: false,
+      timeRangeRequired: false,
+      hasCommentField: true,
+      commentRequired: false,
+      allowsAttachments: true,
+      attachmentsRequired: false,
+      attachmentMaxSizeMb: 50
+    },
+    allowedRoleIds: [3]
+  }),
+  normalizeApplicationType({
     id: 2,
     name: { ka: 'კომანდირების განაცხადი', en: 'Business trip request' },
     description: {
@@ -187,6 +358,37 @@ const DEFAULT_APPLICATION_TYPES: ApplicationType[] = [
     color: 'bg-indigo-500',
     fields: [
       {
+        key: 'reason',
+        label: { ka: 'კომანდირების მიზანი', en: 'Trip purpose' },
+        type: 'textarea',
+        required: true,
+        placeholder: { ka: 'მოკლედ აღწერეთ რას მოიცავს ვიზიტი…', en: 'Summarize the goal of the visit…' }
+      },
+      {
+        key: 'start_date',
+        label: { ka: 'გამგზავრების თარიღი', en: 'Departure date' },
+        type: 'date',
+        required: true
+      },
+      {
+        key: 'end_date',
+        label: { ka: 'დაბრუნების თარიღი', en: 'Return date' },
+        type: 'date',
+        required: true
+      },
+      {
+        key: 'start_time',
+        label: { ka: 'გამგზავრების დრო', en: 'Departure time' },
+        type: 'time',
+        required: false
+      },
+      {
+        key: 'end_time',
+        label: { ka: 'დაბრუნების დრო', en: 'Arrival time' },
+        type: 'time',
+        required: false
+      },
+      {
         key: 'destination',
         label: { ka: 'დანიშნულების ადგილი', en: 'Destination' },
         type: 'text',
@@ -194,37 +396,38 @@ const DEFAULT_APPLICATION_TYPES: ApplicationType[] = [
         placeholder: { ka: 'მაგ. ბარსელონა, ესპანეთი', en: 'e.g. Barcelona, Spain' }
       },
       {
-        key: 'travel_dates',
-        label: { ka: 'გზის თარიღები', en: 'Travel dates' },
-        type: 'date_range',
-        required: true,
-        helper: {
-          ka: 'მიუთითეთ გამგზავრების და დაბრუნების დღეები.',
-          en: 'Include departure and return dates.'
-        }
-      },
-      {
         key: 'budget',
-        label: { ka: 'დაგეგმილი ბიუჯეტი', en: 'Estimated budget' },
+        label: { ka: 'ბიუჯეტის შეფასება', en: 'Budget estimate' },
         type: 'number',
-        required: true,
+        required: false,
         placeholder: { ka: 'მაგ: 2400', en: 'e.g. 2400' }
       },
       {
-        key: 'purpose',
-        label: { ka: 'კომანდირების მიზანი', en: 'Purpose' },
+        key: 'additional_comment',
+        label: { ka: 'დამატებითი მითითება', en: 'Additional note' },
         type: 'textarea',
-        required: true
+        required: false
       }
     ],
     flow: [2, 1],
     slaPerStep: [
       { stepIndex: 0, seconds: 36 * 3600, onExpire: 'BOUNCE_BACK' },
       { stepIndex: 1, seconds: 48 * 3600, onExpire: 'AUTO_APPROVE' }
-    ]
-  }
+    ],
+    capabilities: {
+      requiresDateRange: true,
+      dateRangeRequired: true,
+      requiresTimeRange: true,
+      timeRangeRequired: false,
+      hasCommentField: true,
+      commentRequired: false,
+      allowsAttachments: true,
+      attachmentsRequired: true,
+      attachmentMaxSizeMb: 50
+    },
+    allowedRoleIds: [2, 3]
+  })
 ];
-
 const DEFAULT_APPLICATIONS: ApplicationBundle[] = [
   {
     application: {
@@ -244,7 +447,11 @@ const DEFAULT_APPLICATIONS: ApplicationBundle[] = [
       { applicationId: 1, key: 'start_date', value: '2024-12-19' },
       { applicationId: 1, key: 'end_date', value: '2024-12-26' },
       { applicationId: 1, key: 'contact_phone', value: '+995 555 000 003' },
-      { applicationId: 1, key: 'additional_comment', value: 'საჭიროა შვებულება გამოცდების მზადებისთვის.' }
+      {
+        applicationId: 1,
+        key: 'additional_comment',
+        value: 'საჭიროა შვებულება გამოცდების მზადებისთვის.'
+      }
     ],
     attachments: [
       {
@@ -306,10 +513,22 @@ const DEFAULT_APPLICATIONS: ApplicationBundle[] = [
       dueAt: null
     },
     values: [
+      {
+        applicationId: 2,
+        key: 'reason',
+        value: 'HR ტექნოლოგიების კონფერენციაში მონაწილეობა.'
+      },
+      { applicationId: 2, key: 'start_date', value: '2024-10-05' },
+      { applicationId: 2, key: 'end_date', value: '2024-10-11' },
+      { applicationId: 2, key: 'start_time', value: '09:15' },
+      { applicationId: 2, key: 'end_time', value: '18:45' },
       { applicationId: 2, key: 'destination', value: 'თბილისი → ტალინი' },
-      { applicationId: 2, key: 'travel_dates', value: '2024-10-05/2024-10-11' },
       { applicationId: 2, key: 'budget', value: '3200' },
-      { applicationId: 2, key: 'purpose', value: 'HR ტექნოლოგიების კონფერენციაში მონაწილეობა.' }
+      {
+        applicationId: 2,
+        key: 'additional_comment',
+        value: 'გთხოვთ დაამტკიცოთ სასტუმროს წინასწარი დაჯავშნა.'
+      }
     ],
     attachments: [
       {
@@ -322,13 +541,7 @@ const DEFAULT_APPLICATIONS: ApplicationBundle[] = [
       }
     ],
     auditTrail: [
-      {
-        id: 5,
-        applicationId: 2,
-        actorId: 2,
-        action: 'CREATE',
-        at: '2024-09-12T10:10:00.000Z'
-      },
+      { id: 5, applicationId: 2, actorId: 2, action: 'CREATE', at: '2024-09-12T10:10:00.000Z' },
       {
         id: 6,
         applicationId: 2,
@@ -357,7 +570,6 @@ const DEFAULT_APPLICATIONS: ApplicationBundle[] = [
     delegates: []
   }
 ];
-
 const buildApplicationNumber = (id: number, createdAt: string): string => {
   const year = new Date(createdAt).getFullYear();
   return `TKT-${year}-${id.toString().padStart(5, '0')}`;
@@ -448,8 +660,11 @@ const ensureAdminPermissions = (roles: Role[]): Role[] => {
       permissions = ALL_PERMISSIONS.map((permission) => permission.id);
     }
 
-    if (role.id === 2 && !permissions.includes('set_ticket_priority')) {
-      permissions = [...permissions, 'set_ticket_priority'];
+    if (role.id === 2) {
+      const enriched = new Set(permissions);
+      enriched.add('set_ticket_priority');
+      enriched.add('manage_request_types');
+      permissions = Array.from(enriched);
     }
 
     return {
@@ -469,6 +684,7 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const applicationTypeIdRef = useRef(1);
   const applicationIdRef = useRef(1);
   const attachmentIdRef = useRef(1);
   const auditIdRef = useRef(1);
@@ -932,15 +1148,94 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
     [applicationTypes, applyApprove, applyReject]
   );
 
-  const saveApplications = useCallback(
-    async (nextBundles: ApplicationBundle[]): Promise<void> => {
-      const normalized = normalizeApplications(nextBundles, applicationTypes);
-      const processed = runSlaAutomation(normalized);
-      setApplications(processed);
+  const recomputeApplications = useCallback(
+    (bundles: ApplicationBundle[], types: ApplicationType[]): ApplicationBundle[] => {
+      const normalized = normalizeApplications(bundles, types);
+      const processed = runSlaAutomation(normalized, types);
       storage.set(STORAGE_KEYS.APPLICATIONS, processed);
       syncCounters(processed);
+      return processed;
     },
-    [applicationTypes, runSlaAutomation, syncCounters]
+    [runSlaAutomation, syncCounters]
+  );
+
+  const saveApplications = useCallback(
+    async (
+      nextBundlesOrUpdater:
+        | ApplicationBundle[]
+        | ((current: ApplicationBundle[]) => ApplicationBundle[])
+    ): Promise<ApplicationBundle[]> => {
+      let processed: ApplicationBundle[] = [];
+      setApplications((previous) => {
+        const base =
+          typeof nextBundlesOrUpdater === 'function'
+            ? nextBundlesOrUpdater(previous)
+            : nextBundlesOrUpdater;
+        processed = recomputeApplications(base, applicationTypes);
+        return processed;
+      });
+      return processed;
+    },
+    [applicationTypes, recomputeApplications]
+  );
+
+  const saveApplicationTypes = useCallback(
+    async (
+      nextTypes: ApplicationType[],
+      applicationUpdater?: (current: ApplicationBundle[]) => ApplicationBundle[]
+    ): Promise<void> => {
+      const normalized = normalizeApplicationTypeList(nextTypes);
+      applicationTypeIdRef.current =
+        normalized.reduce((max, type) => Math.max(max, type.id), 0) + 1;
+      setApplicationTypes(normalized);
+      storage.set(STORAGE_KEYS.APPLICATION_TYPES, normalized);
+      setApplications((prev) => {
+        const base = applicationUpdater ? applicationUpdater(prev) : prev;
+        return recomputeApplications(base, normalized);
+      });
+    },
+    [recomputeApplications]
+  );
+
+  const createApplicationType = useCallback(
+    async (payload: Omit<ApplicationType, 'id'>): Promise<ApplicationType> => {
+      const typeId = applicationTypeIdRef.current++;
+      const newType = normalizeApplicationType({ id: typeId, ...payload });
+      const nextTypes = [...applicationTypes, newType];
+      await saveApplicationTypes(nextTypes);
+      return newType;
+    },
+    [applicationTypes, saveApplicationTypes]
+  );
+
+  const updateApplicationType = useCallback(
+    async (payload: ApplicationType): Promise<ApplicationType | null> => {
+      const index = applicationTypes.findIndex((type) => type.id === payload.id);
+      if (index === -1) {
+        return null;
+      }
+
+      const normalized = normalizeApplicationType(payload);
+      const nextTypes = applicationTypes.map((type) => (type.id === payload.id ? normalized : type));
+      await saveApplicationTypes(nextTypes);
+      return normalized;
+    },
+    [applicationTypes, saveApplicationTypes]
+  );
+
+  const deleteApplicationType = useCallback(
+    async (typeId: number): Promise<boolean> => {
+      if (!applicationTypes.some((type) => type.id === typeId)) {
+        return false;
+      }
+
+      const nextTypes = applicationTypes.filter((type) => type.id !== typeId);
+      await saveApplicationTypes(nextTypes, (current) =>
+        current.filter((bundle) => bundle.application.typeId !== typeId)
+      );
+      return true;
+    },
+    [applicationTypes, saveApplicationTypes]
   );
 
   const loadAllData = useCallback(async () => {
@@ -965,7 +1260,9 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
       storage.set(STORAGE_KEYS.TICKETS, resolvedTickets);
 
       const storedTypes = storage.get<ApplicationType[]>(STORAGE_KEYS.APPLICATION_TYPES);
-      const resolvedTypes = storedTypes ?? DEFAULT_APPLICATION_TYPES;
+      const resolvedTypes = normalizeApplicationTypeList(storedTypes ?? DEFAULT_APPLICATION_TYPES);
+      applicationTypeIdRef.current =
+        resolvedTypes.reduce((max, type) => Math.max(max, type.id), 0) + 1;
       setApplicationTypes(resolvedTypes);
       storage.set(STORAGE_KEYS.APPLICATION_TYPES, resolvedTypes);
 
@@ -988,7 +1285,7 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
     } finally {
       setLoading(false);
     }
-  }, [runSlaAutomation, syncCounters]);
+  }, [applicationTypeIdRef, runSlaAutomation, syncCounters]);
 
   useEffect(() => {
     void loadAllData();
@@ -1098,11 +1395,13 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
         delegates: []
       };
 
-      const nextBundles = [...applications, newBundle];
-      await saveApplications(nextBundles);
-      return normalizeApplicationBundle(newBundle, applicationTypes);
+      const processed = await saveApplications((current) => [...current, newBundle]);
+      return (
+        processed.find((bundle) => bundle.application.id === applicationId) ??
+        normalizeApplicationBundle(newBundle, applicationTypes)
+      );
     },
-    [applications, applicationTypes, saveApplications]
+    [applicationTypes, saveApplications]
   );
 
   const submitApplication = useCallback(
@@ -1112,71 +1411,68 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
       comment?: string,
       delegateUserId?: number
     ): Promise<ApplicationBundle | null> => {
-      let updatedBundle: ApplicationBundle | null = null;
-      const nextBundles = applications.map((bundle) => {
-        if (bundle.application.id !== applicationId) {
-          return bundle;
-        }
+      let mutated = false;
+      const processed = await saveApplications((current) =>
+        current.map((bundle) => {
+          if (bundle.application.id !== applicationId) {
+            return bundle;
+          }
+          mutated = true;
+          return applySubmit(bundle, actorId, comment, delegateUserId);
+        })
+      );
 
-        const updated = applySubmit(bundle, actorId, comment, delegateUserId);
-        updatedBundle = updated;
-        return updated;
-      });
-
-      if (!updatedBundle) {
+      if (!mutated) {
         return null;
       }
 
-      await saveApplications(nextBundles);
-      return updatedBundle;
+      return processed.find((bundle) => bundle.application.id === applicationId) ?? null;
     },
-    [applications, applySubmit, saveApplications]
+    [applySubmit, saveApplications]
   );
 
   const approveApplication = useCallback(
     async (applicationId: number, actorId: number, comment?: string): Promise<ApplicationBundle | null> => {
-      let updatedBundle: ApplicationBundle | null = null;
-      const nextBundles = applications.map((bundle) => {
-        if (bundle.application.id !== applicationId) {
-          return bundle;
-        }
+      let mutated = false;
+      const processed = await saveApplications((current) =>
+        current.map((bundle) => {
+          if (bundle.application.id !== applicationId) {
+            return bundle;
+          }
+          mutated = true;
+          return applyApprove(bundle, actorId, 'APPROVE', comment);
+        })
+      );
 
-        const updated = applyApprove(bundle, actorId, 'APPROVE', comment);
-        updatedBundle = updated;
-        return updated;
-      });
-
-      if (!updatedBundle) {
+      if (!mutated) {
         return null;
       }
 
-      await saveApplications(nextBundles);
-      return updatedBundle;
+      return processed.find((bundle) => bundle.application.id === applicationId) ?? null;
     },
-    [applications, applyApprove, saveApplications]
+    [applyApprove, saveApplications]
   );
 
   const rejectApplication = useCallback(
     async (applicationId: number, actorId: number, comment: string): Promise<ApplicationBundle | null> => {
-      let updatedBundle: ApplicationBundle | null = null;
-      const nextBundles = applications.map((bundle) => {
-        if (bundle.application.id !== applicationId) {
-          return bundle;
-        }
+      let mutated = false;
+      const processed = await saveApplications((current) =>
+        current.map((bundle) => {
+          if (bundle.application.id !== applicationId) {
+            return bundle;
+          }
+          mutated = true;
+          return applyReject(bundle, actorId, 'REJECT', comment);
+        })
+      );
 
-        const updated = applyReject(bundle, actorId, 'REJECT', comment);
-        updatedBundle = updated;
-        return updated;
-      });
-
-      if (!updatedBundle) {
+      if (!mutated) {
         return null;
       }
 
-      await saveApplications(nextBundles);
-      return updatedBundle;
+      return processed.find((bundle) => bundle.application.id === applicationId) ?? null;
     },
-    [applications, applyReject, saveApplications]
+    [applyReject, saveApplications]
   );
 
   const resendApplication = useCallback(
@@ -1186,48 +1482,46 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
       comment?: string,
       delegateUserId?: number
     ): Promise<ApplicationBundle | null> => {
-      let updatedBundle: ApplicationBundle | null = null;
-      const nextBundles = applications.map((bundle) => {
-        if (bundle.application.id !== applicationId) {
-          return bundle;
-        }
+      let mutated = false;
+      const processed = await saveApplications((current) =>
+        current.map((bundle) => {
+          if (bundle.application.id !== applicationId) {
+            return bundle;
+          }
+          mutated = true;
+          return applyResend(bundle, actorId, comment, delegateUserId);
+        })
+      );
 
-        const updated = applyResend(bundle, actorId, comment, delegateUserId);
-        updatedBundle = updated;
-        return updated;
-      });
-
-      if (!updatedBundle) {
+      if (!mutated) {
         return null;
       }
 
-      await saveApplications(nextBundles);
-      return updatedBundle;
+      return processed.find((bundle) => bundle.application.id === applicationId) ?? null;
     },
-    [applications, applyResend, saveApplications]
+    [applyResend, saveApplications]
   );
 
   const closeApplication = useCallback(
     async (applicationId: number, actorId: number, comment?: string): Promise<ApplicationBundle | null> => {
-      let updatedBundle: ApplicationBundle | null = null;
-      const nextBundles = applications.map((bundle) => {
-        if (bundle.application.id !== applicationId) {
-          return bundle;
-        }
+      let mutated = false;
+      const processed = await saveApplications((current) =>
+        current.map((bundle) => {
+          if (bundle.application.id !== applicationId) {
+            return bundle;
+          }
+          mutated = true;
+          return applyClose(bundle, actorId, comment);
+        })
+      );
 
-        const updated = applyClose(bundle, actorId, comment);
-        updatedBundle = updated;
-        return updated;
-      });
-
-      if (!updatedBundle) {
+      if (!mutated) {
         return null;
       }
 
-      await saveApplications(nextBundles);
-      return updatedBundle;
+      return processed.find((bundle) => bundle.application.id === applicationId) ?? null;
     },
-    [applications, applyClose, saveApplications]
+    [applyClose, saveApplications]
   );
 
   const addApplicationAttachment = useCallback(
@@ -1236,25 +1530,24 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
       attachment: Omit<Attachment, 'id' | 'applicationId' | 'createdAt'>,
       actorId: number
     ): Promise<ApplicationBundle | null> => {
-      let updatedBundle: ApplicationBundle | null = null;
-      const nextBundles = applications.map((bundle) => {
-        if (bundle.application.id !== applicationId) {
-          return bundle;
-        }
+      let mutated = false;
+      const processed = await saveApplications((current) =>
+        current.map((bundle) => {
+          if (bundle.application.id !== applicationId) {
+            return bundle;
+          }
+          mutated = true;
+          return applyAttachment(bundle, actorId, attachment);
+        })
+      );
 
-        const updated = applyAttachment(bundle, actorId, attachment);
-        updatedBundle = updated;
-        return updated;
-      });
-
-      if (!updatedBundle) {
+      if (!mutated) {
         return null;
       }
 
-      await saveApplications(nextBundles);
-      return updatedBundle;
+      return processed.find((bundle) => bundle.application.id === applicationId) ?? null;
     },
-    [applications, applyAttachment, saveApplications]
+    [applyAttachment, saveApplications]
   );
 
   const updateApplicationValues = useCallback(
@@ -1264,25 +1557,24 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
       values: ApplicationFieldValue[],
       comment?: string
     ): Promise<ApplicationBundle | null> => {
-      let updatedBundle: ApplicationBundle | null = null;
-      const nextBundles = applications.map((bundle) => {
-        if (bundle.application.id !== applicationId) {
-          return bundle;
-        }
+      let mutated = false;
+      const processed = await saveApplications((current) =>
+        current.map((bundle) => {
+          if (bundle.application.id !== applicationId) {
+            return bundle;
+          }
+          mutated = true;
+          return applyValuesUpdate(bundle, actorId, values, comment);
+        })
+      );
 
-        const updated = applyValuesUpdate(bundle, actorId, values, comment);
-        updatedBundle = updated;
-        return updated;
-      });
-
-      if (!updatedBundle) {
+      if (!mutated) {
         return null;
       }
 
-      await saveApplications(nextBundles);
-      return updatedBundle;
+      return processed.find((bundle) => bundle.application.id === applicationId) ?? null;
     },
-    [applications, applyValuesUpdate, saveApplications]
+    [applyValuesUpdate, saveApplications]
   );
 
   const assignApplicationDelegate = useCallback(
@@ -1292,25 +1584,24 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
       delegateUserId: number | null,
       actorId: number
     ): Promise<ApplicationBundle | null> => {
-      let updatedBundle: ApplicationBundle | null = null;
-      const nextBundles = applications.map((bundle) => {
-        if (bundle.application.id !== applicationId) {
-          return bundle;
-        }
+      let mutated = false;
+      const processed = await saveApplications((current) =>
+        current.map((bundle) => {
+          if (bundle.application.id !== applicationId) {
+            return bundle;
+          }
+          mutated = true;
+          return applyDelegate(bundle, actorId, forRoleId, delegateUserId);
+        })
+      );
 
-        const updated = applyDelegate(bundle, actorId, forRoleId, delegateUserId);
-        updatedBundle = updated;
-        return updated;
-      });
-
-      if (!updatedBundle) {
+      if (!mutated) {
         return null;
       }
 
-      await saveApplications(nextBundles);
-      return updatedBundle;
+      return processed.find((bundle) => bundle.application.id === applicationId) ?? null;
     },
-    [applications, applyDelegate, saveApplications]
+    [applyDelegate, saveApplications]
   );
 
   const hasPermission = useCallback(
@@ -1341,7 +1632,11 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
       saveRoles,
       saveUsers,
       saveTickets,
+      saveApplicationTypes,
       saveApplications,
+      createApplicationType,
+      updateApplicationType,
+      deleteApplicationType,
       createApplication,
       submitApplication,
       approveApplication,
@@ -1368,7 +1663,11 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
       saveRoles,
       saveUsers,
       saveTickets,
+      saveApplicationTypes,
       saveApplications,
+      createApplicationType,
+      updateApplicationType,
+      deleteApplicationType,
       createApplication,
       submitApplication,
       approveApplication,

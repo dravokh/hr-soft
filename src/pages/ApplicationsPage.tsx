@@ -13,7 +13,6 @@ import {
   Send,
   UserRound,
   X,
-  Plane,
   ShieldHalf
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -36,11 +35,14 @@ interface AttachmentDraft {
 const classNames = (...classes: (string | false | null | undefined)[]) =>
   classes.filter(Boolean).join(' ');
 
-const TYPE_ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
-  CalendarDays,
-  Plane,
-  ShieldHalf
-};
+const BUILT_IN_FIELD_KEYS = new Set([
+  'reason',
+  'start_date',
+  'end_date',
+  'start_time',
+  'end_time',
+  'additional_comment'
+]);
 
 const STATUS_META: Record<
   ApplicationStatus,
@@ -79,7 +81,7 @@ const COPY: Record<
     title: string;
     subtitle: string;
     create: string;
-    tabs: { all: string; pending: string; sent: string };
+    tabs: { all: string; pending: string; sent: string; returned: string };
     table: { number: string; type: string; requester: string; status: string; updated: string; action: string; empty: string };
     modal: {
       details: string;
@@ -120,7 +122,7 @@ const COPY: Record<
     title: 'განაცხადები',
     subtitle: 'დააკვირდით დამტკიცების პროცესს, გააზიარეთ კომენტარები და მართეთ ავტომატური შეტყობინებები.',
     create: '+ ახალი განაცხადი',
-    tabs: { all: 'ყველა', pending: 'მოლოდინში', sent: 'ჩემი გაგზავნილები' },
+    tabs: { all: 'ყველა', pending: 'მოლოდინში', sent: 'ჩემი გაგზავნილები', returned: 'უკან დაბრუნებული' },
     table: {
       number: '#',
       type: 'ტიპი',
@@ -168,7 +170,7 @@ const COPY: Record<
     title: 'Applications',
     subtitle: 'Track approval workflows, share comments, and manage automated notifications.',
     create: '+ New application',
-    tabs: { all: 'All', pending: 'Pending', sent: 'Sent' },
+    tabs: { all: 'All', pending: 'Pending', sent: 'Sent', returned: 'Returned' },
     table: {
       number: '#',
       type: 'Type',
@@ -234,6 +236,33 @@ const formatDate = (value: string, language: 'ka' | 'en') => {
   return formatter.format(new Date(value));
 };
 
+const formatRemainingTime = (dueAt: string, language: 'ka' | 'en') => {
+  const diff = new Date(dueAt).getTime() - Date.now();
+  if (diff <= 0) {
+    return language === 'ka' ? 'ვადა ამოიწურა' : 'Expired';
+  }
+  const totalMinutes = Math.round(diff / 60000);
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+  const parts: string[] = [];
+  if (days) {
+    parts.push(language === 'ka' ? `${days} დღე` : `${days}d`);
+  }
+  if (hours) {
+    parts.push(language === 'ka' ? `${hours} სთ` : `${hours}h`);
+  }
+  if (!days && minutes) {
+    parts.push(language === 'ka' ? `${minutes} წთ` : `${minutes}m`);
+  }
+  if (!parts.length) {
+    return language === 'ka' ? '1 წთ-ზე ნაკლები დარჩა' : '<1m remaining';
+  }
+  return language === 'ka'
+    ? `დარჩა ${parts.join(' ')}`
+    : `${parts.join(' ')} remaining`;
+};
+
 const getFieldValue = (bundle: ApplicationBundle, key: string): string | undefined => {
   return bundle.values.find((value) => value.key === key)?.value;
 };
@@ -264,7 +293,7 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     addApplicationAttachment
   } = useAppContext();
 
-  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'sent'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'sent' | 'returned'>('all');
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(applicationTypes[0]?.id ?? null);
   const [createValues, setCreateValues] = useState<Record<string, string>>({});
@@ -292,7 +321,16 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
   const userById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
   const roleById = useMemo(() => new Map(roles.map((role) => [role.id, role])), [roles]);
 
-  const canCreate = Boolean(currentUser && hasPermission('create_requests'));
+  const availableTypes = useMemo(() => {
+    if (!currentUser) {
+      return applicationTypes;
+    }
+    return applicationTypes.filter(
+      (type) => type.allowedRoleIds.length === 0 || type.allowedRoleIds.includes(currentUser.roleId)
+    );
+  }, [applicationTypes, currentUser]);
+
+  const canCreate = Boolean(currentUser && hasPermission('create_requests') && availableTypes.length);
   const canApprove = Boolean(currentUser && hasPermission('approve_requests'));
 
   const accessibleApplications = useMemo(() => {
@@ -347,26 +385,42 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     return accessibleApplications.filter((bundle) => bundle.application.requesterId === currentUser.id);
   }, [accessibleApplications, currentUser]);
 
+  const returnedApplications = useMemo(() => {
+    return accessibleApplications.filter((bundle) => {
+      if (bundle.application.status === 'REJECTED' || bundle.application.currentStepIndex < 0) {
+        return true;
+      }
+      const lastEntry = bundle.auditTrail[bundle.auditTrail.length - 1];
+      return lastEntry?.action === 'REJECT' || lastEntry?.action === 'EXPIRE_BOUNCE';
+    });
+  }, [accessibleApplications]);
+
   const filteredApplications = useMemo(() => {
     const source =
       activeTab === 'pending'
         ? pendingApplications
         : activeTab === 'sent'
         ? sentApplications
+        : activeTab === 'returned'
+        ? returnedApplications
         : accessibleApplications;
 
     return [...source].sort(
       (a, b) => new Date(b.application.updatedAt).getTime() - new Date(a.application.updatedAt).getTime()
     );
-  }, [activeTab, accessibleApplications, pendingApplications, sentApplications]);
+  }, [activeTab, accessibleApplications, pendingApplications, returnedApplications, sentApplications]);
 
   const selectedType = selectedTypeId ? typeById.get(selectedTypeId) ?? null : null;
 
   useEffect(() => {
-    if (!selectedTypeId && applicationTypes.length) {
-      setSelectedTypeId(applicationTypes[0].id);
+    if (!availableTypes.length) {
+      setSelectedTypeId(null);
+      return;
     }
-  }, [applicationTypes, selectedTypeId]);
+    if (!selectedTypeId || !availableTypes.some((type) => type.id === selectedTypeId)) {
+      setSelectedTypeId(availableTypes[0].id);
+    }
+  }, [availableTypes, selectedTypeId]);
 
   useEffect(() => {
     if (!selected) {
@@ -384,7 +438,104 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     setCreateAttachments([]);
     setCreateError(null);
     setCreateSuccess(null);
-    setSelectedTypeId(applicationTypes[0]?.id ?? null);
+    setSelectedTypeId(availableTypes[0]?.id ?? null);
+  };
+
+  const handlePrint = () => {
+    if (!selected) {
+      return;
+    }
+    const type = typeById.get(selected.application.typeId);
+    if (!type) {
+      return;
+    }
+    const requester = userById.get(selected.application.requesterId);
+    const statusMeta = STATUS_META[selected.application.status];
+    const fieldRows = type.fields.map((field) => ({
+      label: field.label[language],
+      value: getFieldValue(selected, field.key) ?? '—'
+    }));
+    const escapeHtml = (value: string) =>
+      value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+    const attachmentsHtml = selected.attachments.length
+      ? selected.attachments
+          .map((attachment) => `<li>${escapeHtml(attachment.name)}</li>`)
+          .join('')
+      : `<li>${language === 'ka' ? 'ფაილი არ არის' : 'No attachments'}</li>`;
+
+    const html = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${escapeHtml(selected.application.number)}</title>
+    <style>
+      body { font-family: 'Arial', sans-serif; margin: 0; background: #f1f5f9; }
+      .sheet { width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff; padding: 20mm; box-sizing: border-box; }
+      h1 { font-size: 22px; margin-bottom: 4mm; }
+      h2 { font-size: 16px; margin: 10mm 0 4mm; }
+      table { width: 100%; border-collapse: collapse; margin-top: 6mm; }
+      th, td { border: 1px solid #d1d5db; padding: 6px 8px; font-size: 12px; text-align: left; }
+      th { width: 35%; background: #f8fafc; }
+      .meta { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 8mm; }
+      .meta div { line-height: 1.6; }
+      .status { font-weight: bold; color: #0f172a; }
+      ul { padding-left: 18px; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">
+      <h1>${escapeHtml(type.name[language])}</h1>
+      <div class="meta">
+        <div>
+          <div>${escapeHtml(selected.application.number)}</div>
+          <div>${escapeHtml(statusMeta.label[language])}</div>
+        </div>
+        <div>
+          <div>${escapeHtml(requester?.name ?? '—')}</div>
+          <div>${escapeHtml(requester?.email ?? '')}</div>
+        </div>
+        <div style="text-align:right;">
+          <div>${escapeHtml(formatDateTime(selected.application.createdAt, language))}</div>
+          ${
+            selected.application.dueAt
+              ? `<div>${escapeHtml(formatDateTime(selected.application.dueAt, language))}</div><div>${escapeHtml(
+                  formatRemainingTime(selected.application.dueAt, language)
+                )}</div>`
+              : ''
+          }
+        </div>
+      </div>
+      <table>
+        ${fieldRows
+          .map(
+            (row) =>
+              `<tr><th>${escapeHtml(row.label)}</th><td>${escapeHtml(row.value)}</td></tr>`
+          )
+          .join('')}
+      </table>
+      <h2>${language === 'ka' ? 'დანართები' : 'Attachments'}</h2>
+      <ul>${attachmentsHtml}</ul>
+    </div>
+  </body>
+</html>`;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      return;
+    }
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 200);
   };
 
   const handleCreateSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -414,20 +565,28 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     setCreateError(null);
     setCreateSuccess(null);
 
+    const attachmentsPayload = selectedType.capabilities.allowsAttachments
+      ? createAttachments
+          .filter((attachment) => attachment.name.trim().length > 0)
+          .map((attachment) => ({
+            name: attachment.name,
+            url: attachment.url || '#',
+            uploadedBy: currentUser.id
+          }))
+      : [];
+
+    if (selectedType.capabilities.attachmentsRequired && attachmentsPayload.length === 0) {
+      setCreateError(t.createModal.validation);
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       const values: ApplicationFieldValue[] = selectedType.fields.map((field) => ({
         applicationId: 0,
         key: field.key,
         value: createValues[field.key] ?? ''
       }));
-
-      const attachmentsPayload = createAttachments
-        .filter((attachment) => attachment.name.trim().length > 0)
-        .map((attachment) => ({
-          name: attachment.name,
-          url: attachment.url || '#',
-          uploadedBy: currentUser.id
-        }));
 
       const bundle = await createApplication({
         typeId: selectedType.id,
@@ -545,16 +704,26 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
         editComment.trim() ? editComment.trim() : undefined
       );
 
-      const attachmentsPayload = editAttachments
-        .filter((attachment) => attachment.name.trim().length > 0)
-        .map((attachment) => ({
-          name: attachment.name,
-          url: attachment.url || '#',
-          uploadedBy: currentUser.id
-        }));
+      if (type.capabilities.allowsAttachments) {
+        const attachmentsPayload = editAttachments
+          .filter((attachment) => attachment.name.trim().length > 0)
+          .map((attachment) => ({
+            name: attachment.name,
+            url: attachment.url || '#',
+            uploadedBy: currentUser.id
+          }));
 
-      for (const attachment of attachmentsPayload) {
-        await addApplicationAttachment(selected.application.id, attachment, currentUser.id);
+        if (type.capabilities.attachmentsRequired && selected.attachments.length + attachmentsPayload.length === 0) {
+          setActionError(t.createModal.validation);
+          return;
+        }
+
+        for (const attachment of attachmentsPayload) {
+          await addApplicationAttachment(selected.application.id, attachment, currentUser.id);
+        }
+      } else if (type.capabilities.attachmentsRequired && selected.attachments.length === 0) {
+        setActionError(t.createModal.validation);
+        return;
       }
 
       await resendApplication(
@@ -664,7 +833,7 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
 
     return (
       <input
-        type={field.type === 'date' ? 'date' : 'text'}
+        type={field.type === 'date' ? 'date' : field.type === 'time' ? 'time' : 'text'}
         required={field.required}
         value={value}
         onChange={(event) => updateValue(event.target.value)}
@@ -785,10 +954,31 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
   const renderSummary = (bundle: ApplicationBundle) => {
     const requester = userById.get(bundle.application.requesterId);
     const type = typeById.get(bundle.application.typeId);
-    const rangeValue = getFieldValue(bundle, 'travel_dates') ?? `${getFieldValue(bundle, 'start_date') ?? ''}/${
-      getFieldValue(bundle, 'end_date') ?? ''
-    }`;
-    const { start, end } = splitRange(rangeValue);
+    const startDate = getFieldValue(bundle, 'start_date');
+    const endDate = getFieldValue(bundle, 'end_date');
+    const startTime = getFieldValue(bundle, 'start_time');
+    const endTime = getFieldValue(bundle, 'end_time');
+    const reasonValue = getFieldValue(bundle, 'reason');
+    const commentValue = getFieldValue(bundle, 'additional_comment');
+    const extraFields = type
+      ? type.fields.filter((field) => !BUILT_IN_FIELD_KEYS.has(field.key))
+      : [];
+    const extraFieldEntries = extraFields.map((field) => ({
+      key: field.key,
+      label: field.label[language],
+      value: getFieldValue(bundle, field.key) ?? ''
+    }));
+
+    const formatDateSegment = (date?: string, time?: string) => {
+      if (!date) {
+        return '—';
+      }
+      const formattedDate = formatDate(date, language);
+      if (time) {
+        return `${formattedDate} • ${time}`;
+      }
+      return formattedDate;
+    };
 
     return (
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -797,8 +987,8 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
             <UserRound className="h-5 w-5 text-sky-500" />
             <div>
               <p className="text-xs uppercase tracking-wide text-slate-400">{t.modal.requester}</p>
-              <p className="font-semibold text-slate-700">{requester?.name}</p>
-              <p className="text-xs text-slate-500">{requester?.email}</p>
+              <p className="font-semibold text-slate-700">{requester?.name ?? '—'}</p>
+              <p className="text-xs text-slate-500">{requester?.email ?? '—'}</p>
             </div>
           </div>
         </div>
@@ -809,7 +999,10 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
               <p className="text-xs uppercase tracking-wide text-slate-400">{t.modal.created}</p>
               <p className="font-semibold text-slate-700">{formatDateTime(bundle.application.createdAt, language)}</p>
               {bundle.application.dueAt && (
-                <p className="text-xs text-amber-600">SLA • {formatDateTime(bundle.application.dueAt, language)}</p>
+                <div className="text-xs text-amber-600">
+                  <div>SLA • {formatDateTime(bundle.application.dueAt, language)}</div>
+                  <div>{formatRemainingTime(bundle.application.dueAt, language)}</div>
+                </div>
               )}
             </div>
           </div>
@@ -819,27 +1012,39 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
             <Clock3 className="h-5 w-5 text-indigo-500" />
             <div>
               <p className="text-xs uppercase tracking-wide text-slate-400">{t.modal.period}</p>
-              {start && end ? (
+              {(startDate || endDate) ? (
                 <p className="font-semibold text-slate-700">
-                  {formatDate(start, language)} → {formatDate(end, language)}
+                  {formatDateSegment(startDate, startTime)} → {formatDateSegment(endDate, endTime)}
                 </p>
               ) : (
                 <p className="font-semibold text-slate-500">—</p>
               )}
-              {type && (
-                <p className="text-xs text-slate-500">
-                  {type.description[language]}
-                </p>
-              )}
+              {type && <p className="text-xs text-slate-500">{type.description[language]}</p>}
             </div>
           </div>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <MessageSquare className="h-5 w-5 text-rose-500" />
-            <div>
-              <p className="text-xs uppercase tracking-wide text-slate-400">{t.modal.comment}</p>
-              <p className="text-sm text-slate-600">{getFieldValue(bundle, 'additional_comment') ?? '—'}</p>
+          <div className="flex items-start gap-3">
+            <MessageSquare className="mt-0.5 h-5 w-5 text-rose-500" />
+            <div className="space-y-2 text-sm text-slate-600">
+              {reasonValue && reasonValue.trim() && (
+                <div>
+                  <span className="text-xs uppercase tracking-wide text-slate-400">{language === 'ka' ? 'მიზანი' : 'Purpose'}</span>
+                  <p className="font-medium text-slate-700">{reasonValue}</p>
+                </div>
+              )}
+              {extraFieldEntries.map((entry) => (
+                <div key={entry.key}>
+                  <span className="text-xs uppercase tracking-wide text-slate-400">{entry.label}</span>
+                  <div className="font-medium text-slate-700">
+                    {entry.value.trim() ? entry.value : '—'}
+                  </div>
+                </div>
+              ))}
+              <div>
+                <span className="text-xs uppercase tracking-wide text-slate-400">{t.modal.comment}</span>
+                <p className="text-slate-600">{commentValue?.trim() ? commentValue : '—'}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -851,8 +1056,6 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     if (!createOpen || !selectedType) {
       return null;
     }
-
-    const Icon = TYPE_ICON_MAP[selectedType.icon] ?? FileText;
 
     return (
       <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 px-4">
@@ -874,8 +1077,7 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
           </div>
           <form onSubmit={handleCreateSubmit} className="max-h-[75vh] overflow-y-auto px-6 py-5">
             <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {applicationTypes.map((type) => {
-                const ActiveIcon = TYPE_ICON_MAP[type.icon] ?? FileText;
+              {availableTypes.map((type) => {
                 const isActive = type.id === selectedType.id;
                 return (
                   <button
@@ -884,31 +1086,26 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
                     onClick={() => {
                       setSelectedTypeId(type.id);
                       setCreateValues({});
+                      setCreateAttachments([]);
                     }}
                     className={classNames(
-                      'flex items-start gap-3 rounded-xl border px-4 py-3 text-left transition',
+                      'flex flex-col gap-1 rounded-xl border px-4 py-3 text-left transition',
                       isActive
                         ? 'border-sky-500 bg-sky-50 shadow'
                         : 'border-slate-200 hover:border-sky-200 hover:bg-slate-50'
                     )}
                   >
-                    <ActiveIcon className={classNames('h-6 w-6', isActive ? 'text-sky-600' : 'text-slate-400')} />
-                    <div>
-                      <p className="font-semibold text-slate-700">{type.name[language]}</p>
-                      <p className="text-sm text-slate-500">{type.description[language]}</p>
-                    </div>
+                    <p className="font-semibold text-slate-700">{type.name[language]}</p>
+                    <p className="text-sm text-slate-500">{type.description[language]}</p>
                   </button>
                 );
               })}
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-5">
-              <div className="mb-4 flex items-center gap-3">
-                <Icon className="h-8 w-8 text-sky-500" />
-                <div>
-                  <p className="text-lg font-semibold text-slate-800">{selectedType.name[language]}</p>
-                  <p className="text-sm text-slate-500">{t.createModal.formTitle}</p>
-                </div>
+              <div className="mb-4">
+                <p className="text-lg font-semibold text-slate-800">{selectedType.name[language]}</p>
+                <p className="text-sm text-slate-500">{t.createModal.formTitle}</p>
               </div>
               <div className="space-y-4">
                 {selectedType.fields.map((field) => (
@@ -934,54 +1131,56 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">{t.createModal.attachmentLabel}</label>
+                {selectedType.capabilities.allowsAttachments && (
                   <div className="space-y-2">
-                    {createAttachments.map((attachment, index) => (
-                      <div key={`attachment-${index}`} className="flex items-center gap-3">
-                        <input
-                          type="text"
-                          value={attachment.name}
-                          placeholder="document.pdf"
-                          onChange={(event) => {
-                            const next = [...createAttachments];
-                            next[index] = { ...next[index], name: event.target.value };
-                            setCreateAttachments(next);
-                          }}
-                          className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                        />
-                        <input
-                          type="text"
-                          value={attachment.url}
-                          placeholder="https://…"
-                          onChange={(event) => {
-                            const next = [...createAttachments];
-                            next[index] = { ...next[index], url: event.target.value };
-                            setCreateAttachments(next);
-                          }}
-                          className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCreateAttachments(createAttachments.filter((_, idx) => idx !== index));
-                          }}
-                          className="rounded-lg border border-transparent p-2 text-slate-400 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))}
+                    <label className="text-sm font-semibold text-slate-700">{t.createModal.attachmentLabel}</label>
+                    <div className="space-y-2">
+                      {createAttachments.map((attachment, index) => (
+                        <div key={`attachment-${index}`} className="flex items-center gap-3">
+                          <input
+                            type="text"
+                            value={attachment.name}
+                            placeholder="document.pdf"
+                            onChange={(event) => {
+                              const next = [...createAttachments];
+                              next[index] = { ...next[index], name: event.target.value };
+                              setCreateAttachments(next);
+                            }}
+                            className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                          />
+                          <input
+                            type="text"
+                            value={attachment.url}
+                            placeholder="https://…"
+                            onChange={(event) => {
+                              const next = [...createAttachments];
+                              next[index] = { ...next[index], url: event.target.value };
+                              setCreateAttachments(next);
+                            }}
+                            className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCreateAttachments(createAttachments.filter((_, idx) => idx !== index));
+                            }}
+                            className="rounded-lg border border-transparent p-2 text-slate-400 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCreateAttachments([...createAttachments, { name: '', url: '' }])}
+                      className="flex items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-500 transition hover:border-sky-300 hover:text-sky-600"
+                    >
+                      <Paperclip className="h-4 w-4" />
+                      {t.createModal.attachmentHelp}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setCreateAttachments([...createAttachments, { name: '', url: '' }])}
-                    className="flex items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-500 transition hover:border-sky-300 hover:text-sky-600"
-                  >
-                    <Paperclip className="h-4 w-4" />
-                    {t.createModal.attachmentHelp}
-                  </button>
-                </div>
+                )}
               </div>
             </div>
 
@@ -1020,32 +1219,31 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     }
 
     const type = typeById.get(selected.application.typeId);
-    const Icon = type ? TYPE_ICON_MAP[type.icon] ?? FileText : FileText;
     const statusMeta = STATUS_META[selected.application.status];
 
     return (
       <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 px-4">
         <div className="w-full max-w-5xl rounded-3xl bg-white shadow-2xl">
           <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-                <Icon className="h-6 w-6 text-sky-600" />
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-400">{type?.name[language]}</p>
-                <h2 className="text-2xl font-bold text-slate-800">{selected.application.number}</h2>
-                <p className="text-xs text-slate-500">{formatDateTime(selected.application.createdAt, language)}</p>
-              </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-400">{type?.name[language]}</p>
+              <h2 className="text-2xl font-bold text-slate-800">{selected.application.number}</h2>
+              <p className="text-xs text-slate-500">{formatDateTime(selected.application.createdAt, language)}</p>
             </div>
             <div className="flex items-center gap-3">
               <span className={classNames('flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold', statusMeta.color)}>
                 {statusMeta.icon}
                 {statusMeta.label[language]}
               </span>
-              <button className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+              <button
+                type="button"
+                className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                onClick={handlePrint}
+              >
                 <Printer className="h-5 w-5" />
               </button>
               <button
+                type="button"
                 className="rounded-full p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-500"
                 onClick={closeDetails}
               >
@@ -1141,50 +1339,52 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
                           rows={3}
                         />
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-slate-700">{t.createModal.attachmentLabel}</label>
-                        {editAttachments.map((attachment, index) => (
-                          <div key={`edit-attachment-${index}`} className="flex items-center gap-3">
-                            <input
-                              type="text"
-                              value={attachment.name}
-                              placeholder="document.pdf"
-                              onChange={(event) => {
-                                const next = [...editAttachments];
-                                next[index] = { ...next[index], name: event.target.value };
-                                setEditAttachments(next);
-                              }}
-                              className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                            />
-                            <input
-                              type="text"
-                              value={attachment.url}
-                              placeholder="https://…"
-                              onChange={(event) => {
-                                const next = [...editAttachments];
-                                next[index] = { ...next[index], url: event.target.value };
-                                setEditAttachments(next);
-                              }}
-                              className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setEditAttachments(editAttachments.filter((_, idx) => idx !== index))}
-                              className="rounded-lg border border-transparent p-2 text-slate-400 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-                        ))}
-                        <button
-                          type="button"
-                          onClick={() => setEditAttachments([...editAttachments, { name: '', url: '' }])}
-                          className="flex items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-500 transition hover:border-sky-300 hover:text-sky-600"
-                        >
-                          <Paperclip className="h-4 w-4" />
-                          {t.createModal.attachmentHelp}
-                        </button>
-                      </div>
+                      {type.capabilities.allowsAttachments && (
+                        <div className="space-y-2">
+                          <label className="text-sm font-semibold text-slate-700">{t.createModal.attachmentLabel}</label>
+                          {editAttachments.map((attachment, index) => (
+                            <div key={`edit-attachment-${index}`} className="flex items-center gap-3">
+                              <input
+                                type="text"
+                                value={attachment.name}
+                                placeholder="document.pdf"
+                                onChange={(event) => {
+                                  const next = [...editAttachments];
+                                  next[index] = { ...next[index], name: event.target.value };
+                                  setEditAttachments(next);
+                                }}
+                                className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                              />
+                              <input
+                                type="text"
+                                value={attachment.url}
+                                placeholder="https://…"
+                                onChange={(event) => {
+                                  const next = [...editAttachments];
+                                  next[index] = { ...next[index], url: event.target.value };
+                                  setEditAttachments(next);
+                                }}
+                                className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setEditAttachments(editAttachments.filter((_, idx) => idx !== index))}
+                                className="rounded-lg border border-transparent p-2 text-slate-400 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => setEditAttachments([...editAttachments, { name: '', url: '' }])}
+                            className="flex items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-500 transition hover:border-sky-300 hover:text-sky-600"
+                          >
+                            <Paperclip className="h-4 w-4" />
+                            {t.createModal.attachmentHelp}
+                          </button>
+                        </div>
+                      )}
                       <div className="flex gap-3">
                         <button
                           className="flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-sky-700"
@@ -1231,12 +1431,14 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          {(['all', 'pending', 'sent'] as const).map((tab) => {
+          {(['all', 'pending', 'sent', 'returned'] as const).map((tab) => {
             const count =
               tab === 'pending'
                 ? pendingApplications.length
                 : tab === 'sent'
                 ? sentApplications.length
+                : tab === 'returned'
+                ? returnedApplications.length
                 : accessibleApplications.length;
             return (
               <button
@@ -1287,21 +1489,15 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
               )}
               {filteredApplications.map((bundle) => {
                 const type = typeById.get(bundle.application.typeId);
-                const Icon = type ? TYPE_ICON_MAP[type.icon] ?? FileText : FileText;
                 const requester = userById.get(bundle.application.requesterId);
                 const statusMeta = STATUS_META[bundle.application.status];
                 return (
                   <tr key={bundle.application.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3 text-sm font-semibold text-slate-700">{bundle.application.number}</td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100">
-                          <Icon className="h-5 w-5 text-sky-600" />
-                        </span>
-                        <div>
-                          <p className="font-semibold text-slate-700">{type?.name[language]}</p>
-                          <p className="text-xs text-slate-500">{type?.description[language]}</p>
-                        </div>
+                      <div>
+                        <p className="font-semibold text-slate-700">{type?.name[language]}</p>
+                        <p className="text-xs text-slate-500">{type?.description[language]}</p>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-600">{requester?.name}</td>
