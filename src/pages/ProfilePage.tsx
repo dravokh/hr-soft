@@ -33,8 +33,6 @@ const COPY: Record<ProfilePageProps['language'], {
   permissionsHeading: string;
   permissionsHelper: string;
   permissionsEmpty: string;
-  roleSummaryTitle: string;
-  roleSummarySubtitle: string;
   membersLabel: (count: number) => string;
   systemBadge: string;
   customBadge: string;
@@ -65,8 +63,6 @@ const COPY: Record<ProfilePageProps['language'], {
     permissionsHeading: 'ჩემი უფლებები',
     permissionsHelper: 'უფლება აქტიურია თუ ის მოცემულია ქვემოთ მწვანე ბეჯით. ცვლილებები ძალაში შედის მაშინვე.',
     permissionsEmpty: 'ამ როლს ჯერ არ აქვს მინიჭებული უფლებები.',
-    roleSummaryTitle: 'როლის მიმოხილვა',
-    roleSummarySubtitle: 'იხილეთ როლის აღწერა და რამდენი კოლეგა იყენებს ამავე წვდომებს.',
     membersLabel: (count: number) => {
       if (count === 0) return '0 მომხმარებელი';
       if (count === 1) return '1 მომხმარებელი';
@@ -101,8 +97,6 @@ const COPY: Record<ProfilePageProps['language'], {
     permissionsHeading: 'My permissions',
     permissionsHelper: 'Active permissions are highlighted below. Updates apply instantly to your session.',
     permissionsEmpty: 'No permissions have been granted to this role yet.',
-    roleSummaryTitle: 'Role overview',
-    roleSummarySubtitle: 'Review the role description and see how many teammates share this access.',
     membersLabel: (count: number) => {
       if (count === 0) return '0 members';
       if (count === 1) return '1 member';
@@ -333,14 +327,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ language }) => {
                 </div>
               </div>
             </div>
-
-            {activeRole && (
-              <div className="rounded-2xl border border-blue-100 bg-blue-50/70 px-5 py-4 text-sm text-blue-700 max-w-sm">
-                <h3 className="text-base font-semibold text-blue-800">{t.roleSummaryTitle}</h3>
-                <p className="mt-2 text-sm text-blue-700/80">{t.roleSummarySubtitle}</p>
-                <p className="mt-3 text-sm font-medium text-blue-900">{activeRole.description}</p>
-              </div>
-            )}
           </div>
 
           <dl className="grid gap-6 md:grid-cols-3">

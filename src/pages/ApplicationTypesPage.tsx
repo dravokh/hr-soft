@@ -97,6 +97,8 @@ const COPY: Record<
     edit: string;
     view: string;
     empty: string;
+    typePickerLabel: string;
+    typePickerPlaceholder: string;
     basicInformation: string;
     nameKa: string;
     nameEn: string;
@@ -110,10 +112,15 @@ const COPY: Record<
     commentLabel: string;
     toggles: {
       requiresDateRange: string;
+      dateRangeRequired: string;
       requiresTimeRange: string;
+      timeRangeRequired: string;
       hasCommentField: string;
+      commentRequired: string;
       allowsAttachments: string;
+      attachmentsRequired: string;
     };
+    attachmentSizeLabel: string;
     allowedRoles: string;
     customFieldTitle: string;
     addCustomField: string;
@@ -145,6 +152,8 @@ const COPY: Record<
     edit: 'ტიპის რედაქტირება',
     view: 'ტიპის დეტალები',
     empty: 'ჯერ არცერთი განაცხადის ტიპი არ არის შექმნილი.',
+    typePickerLabel: 'არსებული ტიპები',
+    typePickerPlaceholder: 'აირჩიეთ ტიპი რედაქტირებისთვის…',
     basicInformation: 'ძირითადი ინფორმაცია',
     nameKa: 'დასახელება (ქართ.)',
     nameEn: 'დასახელება (ინგლ.)',
@@ -158,10 +167,15 @@ const COPY: Record<
     commentLabel: 'კომენტარის ველის სათაური',
     toggles: {
       requiresDateRange: 'საჭიროა კალენდრის დიაპაზონი',
+      dateRangeRequired: 'თარიღის დიაპაზონი სავალდებულოა',
       requiresTimeRange: 'საჭიროა დროის დიაპაზონი',
+      timeRangeRequired: 'დროის დიაპაზონი სავალდებულოა',
       hasCommentField: 'დამატებითი კომენტარი',
-      allowsAttachments: 'ფაილების ატვირთვა დაშვებულია'
+      commentRequired: 'კომენტარი სავალდებულოა',
+      allowsAttachments: 'ფაილების ატვირთვა დაშვებულია',
+      attachmentsRequired: 'ფაილის დამატება სავალდებულოა'
     },
+    attachmentSizeLabel: 'ფაილის მაქსიმალური ზომა (MB)',
     allowedRoles: 'ვინ შეუძლია განაცხადის შექმნა',
     customFieldTitle: 'დამატებითი ველები',
     addCustomField: 'ველი',
@@ -204,6 +218,8 @@ const COPY: Record<
     edit: 'Edit type',
     view: 'Type overview',
     empty: 'No application types have been created yet.',
+    typePickerLabel: 'Existing types',
+    typePickerPlaceholder: 'Select a type to edit…',
     basicInformation: 'Basic information',
     nameKa: 'Name (Georgian)',
     nameEn: 'Name (English)',
@@ -217,10 +233,15 @@ const COPY: Record<
     commentLabel: 'Comment field label',
     toggles: {
       requiresDateRange: 'Require calendar range',
+      dateRangeRequired: 'Date range is mandatory',
       requiresTimeRange: 'Require time range',
+      timeRangeRequired: 'Time range is mandatory',
       hasCommentField: 'Include comment box',
-      allowsAttachments: 'Allow attachments'
+      commentRequired: 'Comment is required',
+      allowsAttachments: 'Allow attachments',
+      attachmentsRequired: 'Attachments are required'
     },
+    attachmentSizeLabel: 'Maximum attachment size (MB)',
     allowedRoles: 'Who can submit this request',
     customFieldTitle: 'Additional fields',
     addCustomField: 'Add field',
@@ -297,10 +318,15 @@ const buildDefaultFormState = (): FormState => ({
   icon: 'Layers3',
   color: 'bg-slate-500',
   capabilities: {
-    requiresDateRange: true,
+    requiresDateRange: false,
+    dateRangeRequired: false,
     requiresTimeRange: false,
-    hasCommentField: true,
-    allowsAttachments: true
+    timeRangeRequired: false,
+    hasCommentField: false,
+    commentRequired: false,
+    allowsAttachments: false,
+    attachmentsRequired: false,
+    attachmentMaxSizeMb: 50
   },
   flow: [],
   sla: [],
@@ -356,13 +382,13 @@ const buildFields = (form: FormState): ApplicationFieldDefinition[] => {
       key: 'start_date',
       label: { ka: 'დაწყების თარიღი', en: 'Start date' },
       type: 'date',
-      required: true
+      required: form.capabilities.dateRangeRequired
     });
     fields.push({
       key: 'end_date',
       label: { ka: 'დასრულების თარიღი', en: 'End date' },
       type: 'date',
-      required: true
+      required: form.capabilities.dateRangeRequired
     });
   }
 
@@ -371,13 +397,13 @@ const buildFields = (form: FormState): ApplicationFieldDefinition[] => {
       key: 'start_time',
       label: { ka: 'დაწყების დრო', en: 'Start time' },
       type: 'time',
-      required: false
+      required: form.capabilities.timeRangeRequired
     });
     fields.push({
       key: 'end_time',
       label: { ka: 'დასრულების დრო', en: 'End time' },
       type: 'time',
-      required: false
+      required: form.capabilities.timeRangeRequired
     });
   }
 
@@ -386,7 +412,7 @@ const buildFields = (form: FormState): ApplicationFieldDefinition[] => {
       key: 'additional_comment',
       label: { ka: form.commentLabelKa || 'დამატებითი კომენტარი', en: form.commentLabelEn || 'Additional comment' },
       type: 'textarea',
-      required: false,
+      required: form.capabilities.commentRequired,
       placeholder: DEFAULT_COMMENT_PLACEHOLDER
     });
   }
@@ -411,6 +437,21 @@ const validateForm = (form: FormState): boolean => {
     return false;
   }
   if (!form.flow.length) {
+    return false;
+  }
+  if (form.capabilities.dateRangeRequired && !form.capabilities.requiresDateRange) {
+    return false;
+  }
+  if (form.capabilities.timeRangeRequired && !form.capabilities.requiresTimeRange) {
+    return false;
+  }
+  if (form.capabilities.commentRequired && !form.capabilities.hasCommentField) {
+    return false;
+  }
+  if (form.capabilities.attachmentsRequired && !form.capabilities.allowsAttachments) {
+    return false;
+  }
+  if (form.capabilities.attachmentMaxSizeMb <= 0) {
     return false;
   }
   if (form.customFields.some((field) => !field.key.trim() || !field.labelKa.trim() || !field.labelEn.trim())) {
@@ -754,6 +795,44 @@ export const ApplicationTypesPage: React.FC<ApplicationTypesPageProps> = ({ lang
             </div>
           )}
 
+          {applicationTypes.length > 0 && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <label className="text-sm font-semibold text-slate-700" htmlFor="type-picker">
+                {t.typePickerLabel}
+              </label>
+              <select
+                id="type-picker"
+                value={selectedTypeId ?? ''}
+                onChange={(event) => {
+                  const value = event.target.value ? Number(event.target.value) : null;
+                  setStatusMessage(null);
+                  setErrorMessage(null);
+                  setAllowedRolesOpen(false);
+                  if (value === null) {
+                    setSelectedTypeId(null);
+                    setMode('create');
+                    setFormState(buildDefaultFormState());
+                    return;
+                  }
+                  setSelectedTypeId(value);
+                  const nextType = applicationTypes.find((type) => type.id === value) ?? null;
+                  if (nextType) {
+                    setFormState(buildFormStateFromType(nextType));
+                    setMode('view');
+                  }
+                }}
+                className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              >
+                <option value="">{t.typePickerPlaceholder}</option>
+                {applicationTypes.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.name[language]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {applicationTypes.map((type) => {
             const Icon = getIconComponent(type.icon);
             const active = selectedTypeId === type.id && mode !== 'create';
@@ -919,25 +998,181 @@ export const ApplicationTypesPage: React.FC<ApplicationTypesPageProps> = ({ lang
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
-                {Object.entries(formState.capabilities).map(([key, value]) => (
-                  <label key={key} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(value)}
-                      onChange={(event) =>
-                        setFormState((prev) => ({
-                          ...prev,
-                          capabilities: {
-                            ...prev.capabilities,
-                            [key]: event.target.checked
-                          }
-                        }))
-                      }
-                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    {t.toggles[key as keyof ApplicationTypeCapabilities]}
-                  </label>
-                ))}
+                <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={formState.capabilities.requiresDateRange}
+                    onChange={(event) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        capabilities: {
+                          ...prev.capabilities,
+                          requiresDateRange: event.target.checked,
+                          dateRangeRequired: event.target.checked
+                            ? prev.capabilities.dateRangeRequired
+                            : false
+                        }
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  {t.toggles.requiresDateRange}
+                </label>
+                <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={formState.capabilities.dateRangeRequired}
+                    disabled={!formState.capabilities.requiresDateRange}
+                    onChange={(event) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        capabilities: {
+                          ...prev.capabilities,
+                          dateRangeRequired: event.target.checked
+                        }
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
+                  />
+                  {t.toggles.dateRangeRequired}
+                </label>
+
+                <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={formState.capabilities.requiresTimeRange}
+                    onChange={(event) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        capabilities: {
+                          ...prev.capabilities,
+                          requiresTimeRange: event.target.checked,
+                          timeRangeRequired: event.target.checked
+                            ? prev.capabilities.timeRangeRequired
+                            : false
+                        }
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  {t.toggles.requiresTimeRange}
+                </label>
+                <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={formState.capabilities.timeRangeRequired}
+                    disabled={!formState.capabilities.requiresTimeRange}
+                    onChange={(event) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        capabilities: {
+                          ...prev.capabilities,
+                          timeRangeRequired: event.target.checked
+                        }
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
+                  />
+                  {t.toggles.timeRangeRequired}
+                </label>
+
+                <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={formState.capabilities.hasCommentField}
+                    onChange={(event) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        capabilities: {
+                          ...prev.capabilities,
+                          hasCommentField: event.target.checked,
+                          commentRequired: event.target.checked
+                            ? prev.capabilities.commentRequired
+                            : false
+                        }
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  {t.toggles.hasCommentField}
+                </label>
+                <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={formState.capabilities.commentRequired}
+                    disabled={!formState.capabilities.hasCommentField}
+                    onChange={(event) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        capabilities: {
+                          ...prev.capabilities,
+                          commentRequired: event.target.checked
+                        }
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
+                  />
+                  {t.toggles.commentRequired}
+                </label>
+
+                <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={formState.capabilities.allowsAttachments}
+                    onChange={(event) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        capabilities: {
+                          ...prev.capabilities,
+                          allowsAttachments: event.target.checked,
+                          attachmentsRequired: event.target.checked
+                            ? prev.capabilities.attachmentsRequired
+                            : false
+                        }
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  {t.toggles.allowsAttachments}
+                </label>
+                <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={formState.capabilities.attachmentsRequired}
+                    disabled={!formState.capabilities.allowsAttachments}
+                    onChange={(event) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        capabilities: {
+                          ...prev.capabilities,
+                          attachmentsRequired: event.target.checked
+                        }
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
+                  />
+                  {t.toggles.attachmentsRequired}
+                </label>
+
+                <div className="md:col-span-2 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  <span className="font-medium text-slate-700">{t.attachmentSizeLabel}</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={formState.capabilities.attachmentMaxSizeMb}
+                    onChange={(event) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        capabilities: {
+                          ...prev.capabilities,
+                          attachmentMaxSizeMb: Math.max(1, Number(event.target.value))
+                        }
+                      }))
+                    }
+                    className="w-24 rounded-lg border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={!formState.capabilities.allowsAttachments}
+                  />
+                </div>
               </div>
             </section>
 
