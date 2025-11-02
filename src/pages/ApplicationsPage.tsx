@@ -35,16 +35,7 @@ interface AttachmentDraft {
 const classNames = (...classes: (string | false | null | undefined)[]) =>
   classes.filter(Boolean).join(' ');
 
-const BUILTIN_FIELD_KEYS = new Set([
-  'reason',
-  'start_date',
-  'end_date',
-  'start_time',
-  'end_time',
-  'additional_comment'
-]);
-
-const BUILTIN_FIELD_KEYS = new Set([
+const BUILT_IN_FIELD_KEYS = new Set([
   'reason',
   'start_date',
   'end_date',
@@ -970,7 +961,7 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     const reasonValue = getFieldValue(bundle, 'reason');
     const commentValue = getFieldValue(bundle, 'additional_comment');
     const extraFields = type
-      ? type.fields.filter((field) => !BUILTIN_FIELD_KEYS.has(field.key))
+      ? type.fields.filter((field) => !BUILT_IN_FIELD_KEYS.has(field.key))
       : [];
     const extraFieldEntries = extraFields.map((field) => ({
       key: field.key,
