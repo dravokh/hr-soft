@@ -1,14 +1,13 @@
 import React from 'react';
 import { LogOut, Menu, X } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
+import { Language, LocalizedValue } from '../../types';
+import { AVAILABLE_LANGUAGES, getLocalizedValue, LANGUAGE_LABELS } from '../../utils/i18n';
 
 export interface MenuItem {
   id: string;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  label: {
-    ka: string;
-    en: string;
-  };
+  label: LocalizedValue<string>;
 }
 
 interface MainLayoutProps {
@@ -16,8 +15,8 @@ interface MainLayoutProps {
   setCurrentPage: (page: string) => void;
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
-  language: 'ka' | 'en';
-  setLanguage: (language: 'ka' | 'en') => void;
+  language: Language;
+  setLanguage: (language: Language) => void;
   menuItems: MenuItem[];
   children: React.ReactNode;
 }
@@ -63,7 +62,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                     }`}
                   >
                     <Icon className="w-5 h-5 mr-3" />
-                    <span className="text-sm">{item.label[language]}</span>
+                    <span className="text-sm">{getLocalizedValue(item.label, language)}</span>
                   </button>
                 );
               })}
@@ -78,26 +77,22 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 </div>
               </div>
 
-              <div className="flex gap-2 mb-3">
-                <button
-                  type="button"
-                  onClick={() => setLanguage('ka')}
-                  className={`flex-1 py-2 rounded-lg text-xs transition-all ${
-                    language === 'ka' ? 'bg-blue-500' : 'bg-slate-700 hover:bg-slate-600'
-                  }`}
-                >
-                  ქართული
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLanguage('en')}
-                  className={`flex-1 py-2 rounded-lg text-xs transition-all ${
-                    language === 'en' ? 'bg-blue-500' : 'bg-slate-700 hover:bg-slate-600'
-                  }`}
-                >
-                  English
-                </button>
-              </div>
+              {AVAILABLE_LANGUAGES.length > 1 && (
+                <div className="flex gap-2 mb-3">
+                  {AVAILABLE_LANGUAGES.map((languageCode) => (
+                    <button
+                      key={languageCode}
+                      type="button"
+                      onClick={() => setLanguage(languageCode)}
+                      className={`flex-1 py-2 rounded-lg text-xs transition-all ${
+                        language === languageCode ? 'bg-blue-500' : 'bg-slate-700 hover:bg-slate-600'
+                      }`}
+                    >
+                      {LANGUAGE_LABELS[languageCode]}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               <button
                 type="button"

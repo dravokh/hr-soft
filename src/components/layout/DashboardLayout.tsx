@@ -17,15 +17,29 @@ import { PermissionsPage } from '../../pages/PermissionsPage';
 import { ApplicationsPage } from '../../pages/ApplicationsPage';
 import { ApplicationTypesPage } from '../../pages/application-types';
 import { MainLayout, MenuItem } from './MainLayout';
+import { Language } from '../../types';
+import { DEFAULT_LANGUAGE, resolveLanguageKey } from '../../utils/i18n';
 
 const MENU_DEFINITIONS: MenuItem[] = [
-  { id: 'dashboard', icon: LayoutDashboard, label: { ka: 'მთავარი', en: 'Dashboard' } },
-  { id: 'profile', icon: UserCog, label: { ka: 'ჩემი გვერდი', en: 'My Profile' } },
-  { id: 'roles', icon: Shield, label: { ka: 'როლები', en: 'Roles' } },
-  { id: 'users', icon: Users, label: { ka: 'მომხმარებლები', en: 'Users' } },
-  { id: 'applications', icon: FileText, label: { ka: 'განაცხადები', en: 'Applications' } },
-  { id: 'applicationTypes', icon: Settings2, label: { ka: 'განაცხადების ტიპები', en: 'Application types' } },
-  { id: 'permissions', icon: Lock, label: { ka: 'უფლებები', en: 'Permissions' } }
+  {
+    id: 'dashboard',
+    icon: LayoutDashboard,
+    label: { ka: 'მთავარი', en: 'Dashboard', tr: 'Kontrol paneli' }
+  },
+  {
+    id: 'profile',
+    icon: UserCog,
+    label: { ka: 'ჩემი გვერდი', en: 'My Profile', tr: 'Profilim' }
+  },
+  { id: 'roles', icon: Shield, label: { ka: 'როლები', en: 'Roles', tr: 'Roller' } },
+  { id: 'users', icon: Users, label: { ka: 'მომხმარებლები', en: 'Users', tr: 'Kullanıcılar' } },
+  { id: 'applications', icon: FileText, label: { ka: 'განაცხადები', en: 'Applications', tr: 'Başvurular' } },
+  {
+    id: 'applicationTypes',
+    icon: Settings2,
+    label: { ka: 'განაცხადების ტიპები', en: 'Application types', tr: 'Başvuru türleri' }
+  },
+  { id: 'permissions', icon: Lock, label: { ka: 'უფლებები', en: 'Permissions', tr: 'Yetkiler' } }
 ];
 
 const MENU_PERMISSIONS: Record<string, string> = {
@@ -42,7 +56,7 @@ export const DashboardLayout: React.FC = () => {
   const { hasPermission } = useAppContext();
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [language, setLanguage] = useState<'ka' | 'en'>('ka');
+  const [language, setLanguage] = useState<Language>(DEFAULT_LANGUAGE);
 
   const menuItems = useMemo(
     () => MENU_DEFINITIONS.filter((item) => hasPermission(MENU_PERMISSIONS[item.id])),
@@ -55,22 +69,24 @@ export const DashboardLayout: React.FC = () => {
     }
   }, [currentPage, menuItems]);
 
+  const resolvedLanguage = resolveLanguageKey(language);
+
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard':
-        return <DashboardPage language={language} />;
+        return <DashboardPage language={resolvedLanguage} />;
       case 'profile':
-        return <ProfilePage language={language} />;
+        return <ProfilePage language={resolvedLanguage} />;
       case 'roles':
-        return <RolesPage language={language} />;
+        return <RolesPage language={resolvedLanguage} />;
       case 'users':
-        return <UsersPage language={language} />;
+        return <UsersPage language={resolvedLanguage} />;
       case 'applications':
-        return <ApplicationsPage language={language} />;
+        return <ApplicationsPage language={resolvedLanguage} />;
       case 'applicationTypes':
-        return <ApplicationTypesPage language={language} />;
+        return <ApplicationTypesPage language={resolvedLanguage} />;
       case 'permissions':
-        return <PermissionsPage language={language} />;
+        return <PermissionsPage language={resolvedLanguage} />;
       default:
         return <div className="text-center py-20 text-slate-600">Access Denied</div>;
     }
