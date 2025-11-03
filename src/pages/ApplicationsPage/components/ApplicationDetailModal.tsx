@@ -99,6 +99,7 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
   editFileInputRef
 }) => {
   const [isPrintMode, setIsPrintMode] = React.useState(false);
+  const [showActivity, setShowActivity] = React.useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   const t = COPY[language];
@@ -378,47 +379,47 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
     };
 
     return (
-      <div ref={printRef} className="print:block hidden">
-        <div className="max-w-4xl mx-auto p-8 bg-white">
+      <div ref={printRef} className="hidden print-show">
+        <div className="max-w-full p-6 bg-white" style={{ pageBreakAfter: 'avoid' }}>
           {/* Header */}
-          <div className="border-b-2 border-slate-300 pb-4 mb-6">
-            <h1 className="text-2xl font-bold text-slate-900 mb-1">{printT.summaryTitle}</h1>
+          <div className="border-b-2 border-slate-300 pb-3 mb-4">
+            <h1 className="text-xl font-bold text-slate-900 mb-1">{printT.summaryTitle}</h1>
             <div className="flex justify-between items-center">
-              <p className="text-lg font-semibold text-slate-700">{bundle.application.number}</p>
-              <p className="text-sm text-slate-600">{formatDateTime(bundle.application.createdAt, language)}</p>
+              <p className="text-base font-semibold text-slate-700">{bundle.application.number}</p>
+              <p className="text-xs text-slate-600">{formatDateTime(bundle.application.createdAt, language)}</p>
             </div>
           </div>
 
           {/* Basic Information */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
-              <p className="text-xs uppercase font-semibold text-slate-500 mb-1">{printT.requester}</p>
+              <p className="text-xs uppercase font-semibold text-slate-500 mb-0.5">{printT.requester}</p>
               <p className="text-sm font-medium text-slate-900">{requester?.name ?? '—'}</p>
               <p className="text-xs text-slate-600">{requester?.email ?? '—'}</p>
             </div>
             <div>
-              <p className="text-xs uppercase font-semibold text-slate-500 mb-1">{printT.status}</p>
+              <p className="text-xs uppercase font-semibold text-slate-500 mb-0.5">{printT.status}</p>
               <p className="text-sm font-medium text-slate-900">{statusMeta.label[language]}</p>
             </div>
             <div>
-              <p className="text-xs uppercase font-semibold text-slate-500 mb-1">{t.modal.period}</p>
+              <p className="text-xs uppercase font-semibold text-slate-500 mb-0.5">{t.modal.period}</p>
               <p className="text-sm font-medium text-slate-900">
                 {formatDateSegment(startDate, startTime)} → {formatDateSegment(endDate, endTime)}
               </p>
             </div>
             <div>
-              <p className="text-xs uppercase font-semibold text-slate-500 mb-1">{language === 'ka' ? 'ტიპი' : 'Type'}</p>
+              <p className="text-xs uppercase font-semibold text-slate-500 mb-0.5">{language === 'ka' ? 'ტიპი' : 'Type'}</p>
               <p className="text-sm font-medium text-slate-900">{type?.description[language] ?? '—'}</p>
             </div>
           </div>
 
           {/* Fields */}
-          <div className="mb-6">
-            <h2 className="text-sm uppercase font-semibold text-slate-700 mb-3 border-b border-slate-200 pb-2">{printT.fields}</h2>
-            <div className="space-y-3">
+          <div className="mb-4">
+            <h2 className="text-xs uppercase font-semibold text-slate-700 mb-2 border-b border-slate-200 pb-1">{printT.fields}</h2>
+            <div className="space-y-2">
               {reasonValue && reasonValue.trim() && (
                 <div>
-                  <p className="text-xs uppercase font-semibold text-slate-500 mb-1">{language === 'ka' ? 'მიზანი' : 'Purpose'}</p>
+                  <p className="text-xs uppercase font-semibold text-slate-500 mb-0.5">{language === 'ka' ? 'მიზანი' : 'Purpose'}</p>
                   <p className="text-sm text-slate-900">{reasonValue}</p>
                 </div>
               )}
@@ -426,14 +427,14 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
                 const value = getFieldValue(bundle, field.key);
                 return (
                   <div key={field.key}>
-                    <p className="text-xs uppercase font-semibold text-slate-500 mb-1">{field.label[language]}</p>
+                    <p className="text-xs uppercase font-semibold text-slate-500 mb-0.5">{field.label[language]}</p>
                     <p className="text-sm text-slate-900">{value && value.trim() ? value : '—'}</p>
                   </div>
                 );
               })}
               {commentValue?.trim() && (
                 <div>
-                  <p className="text-xs uppercase font-semibold text-slate-500 mb-1">{t.modal.comment}</p>
+                  <p className="text-xs uppercase font-semibold text-slate-500 mb-0.5">{t.modal.comment}</p>
                   <p className="text-sm text-slate-900">{commentValue}</p>
                 </div>
               )}
@@ -443,8 +444,8 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
           {/* Attachments */}
           {bundle.attachments.length > 0 && (
             <div>
-              <h2 className="text-sm uppercase font-semibold text-slate-700 mb-3 border-b border-slate-200 pb-2">{printT.attachments}</h2>
-              <ul className="space-y-1">
+              <h2 className="text-xs uppercase font-semibold text-slate-700 mb-2 border-b border-slate-200 pb-1">{printT.attachments}</h2>
+              <ul className="space-y-0.5">
                 {bundle.attachments.map((attachment) => (
                   <li key={attachment.id} className="text-sm text-slate-700">
                     • {attachment.name}
@@ -554,7 +555,7 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
   return (
     <>
       {renderPrintView(selected)}
-      <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 print:hidden">
+      <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 print-hide">
         <div className="w-full max-w-6xl rounded-2xl bg-white shadow-xl overflow-hidden">
         {/* Professional Header */}
         <div className="relative bg-slate-700 px-8 py-6">
@@ -601,21 +602,44 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
             {/* Summary Cards with Better Styling */}
             {renderSummary(selected)}
 
-            {/* Attachments and History Grid */}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                <h3 className="text-sm font-semibold text-slate-700 mb-4 uppercase tracking-wider">
-                  {t.modal.attachments}
-                </h3>
-                {renderAttachments(selected)}
-              </div>
+            {/* Attachments */}
+            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-700 mb-4 uppercase tracking-wider">
+                {t.modal.attachments}
+              </h3>
+              {renderAttachments(selected)}
+            </div>
+
+            {/* Activity Toggle Button */}
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShowActivity(!showActivity)}
+                className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                {showActivity ? (
+                  <>
+                    <X className="h-4 w-4" />
+                    {t.modal.hideHistory}
+                  </>
+                ) : (
+                  <>
+                    <Clock3 className="h-4 w-4" />
+                    {t.modal.showHistory}
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Activity Section - Conditionally Rendered */}
+            {showActivity && (
               <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                 <h3 className="text-sm font-semibold text-slate-700 mb-4 uppercase tracking-wider">
                   {t.modal.history}
                 </h3>
                 {renderAuditTrail(selected)}
               </div>
-            </div>
+            )}
 
             {actionMessage && (
               <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-emerald-700 font-medium">

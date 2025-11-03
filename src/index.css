@@ -61,17 +61,12 @@ body {
     -webkit-print-color-adjust: exact;
   }
 
-  /* Hide everything except print content */
-  body > *:not(.print-container) {
+  /* Hide modal and show print view */
+  .print-hide {
     display: none !important;
   }
 
-  /* Ensure print content is visible */
-  .print\:block {
+  .print-show {
     display: block !important;
-  }
-
-  .print\:hidden {
-    display: none !important;
   }
 }
