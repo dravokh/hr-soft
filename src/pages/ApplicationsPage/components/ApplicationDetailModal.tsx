@@ -98,7 +98,11 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
   onEditFileUpload,
   editFileInputRef
 }) => {
+  const [isPrintMode, setIsPrintMode] = React.useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
+
   const t = COPY[language];
+  const printT = PRINT_COPY[language];
   const type = typeById.get(selected.application.typeId);
   const statusMeta = STATUS_META[selected.application.status];
 
@@ -200,8 +204,8 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
     }
 
     return (
-      <div className="relative rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 p-6 border-2 border-slate-200 shadow-lg">
-        <div className="absolute top-3 right-3 text-xs font-bold text-slate-400 uppercase tracking-wider">
+      <div className="relative rounded-lg bg-white p-5 border border-slate-200 shadow-sm">
+        <div className="absolute top-3 right-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">
           {language === 'ka' ? 'პროცესი' : 'WORKFLOW'}
         </div>
         <div className="flex flex-wrap items-center gap-4">
@@ -212,21 +216,21 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
 
             return (
               <div key={`${bundle.application.id}-step-${roleId}`} className="flex items-center gap-3">
-                <div className="flex items-center gap-3 bg-white rounded-xl px-4 py-3 border-2 border-slate-200 shadow-md">
+                <div className="flex items-center gap-3 bg-slate-50 rounded-lg px-4 py-3 border border-slate-200">
                   <div
                     className={classNames(
-                      'flex h-11 w-11 items-center justify-center rounded-xl text-sm font-bold shadow-lg transition-all duration-300',
+                      'flex h-10 w-10 items-center justify-center rounded-lg text-sm font-semibold',
                       isCompleted
-                        ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white scale-105'
+                        ? 'bg-emerald-600 text-white'
                         : isCurrent
-                        ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white scale-105 animate-pulse'
-                        : 'bg-slate-100 text-slate-400 border-2 border-slate-300'
+                        ? 'bg-amber-500 text-white'
+                        : 'bg-slate-200 text-slate-500'
                     )}
                   >
                     {isCompleted ? <CheckCircle2 className="h-5 w-5" /> : isCurrent ? <Clock3 className="h-5 w-5" /> : index + 1}
                   </div>
                   <div className="flex flex-col">
-                    <span className={classNames('font-bold text-sm', isCompleted || isCurrent ? 'text-slate-800' : 'text-slate-500')}>
+                    <span className={classNames('font-semibold text-sm', isCompleted || isCurrent ? 'text-slate-800' : 'text-slate-500')}>
                       {role?.name ?? 'Role'}
                     </span>
                     <span className="text-xs text-slate-500">{role?.description ?? ''}</span>
@@ -234,7 +238,7 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
                 </div>
                 {index < type.flow.length - 1 && (
                   <div className="flex items-center">
-                    <ArrowLeftRight className={classNames('h-5 w-5', isCompleted ? 'text-emerald-500' : 'text-slate-300')} />
+                    <ArrowLeftRight className={classNames('h-5 w-5', isCompleted ? 'text-emerald-600' : 'text-slate-300')} />
                   </div>
                 )}
               </div>
@@ -279,13 +283,13 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
   const renderAuditTrail = (bundle: ApplicationBundle) => {
     const actionColors: Record<string, { bg: string; text: string }> = {
       CREATE: { bg: 'bg-blue-100', text: 'text-blue-700' },
-      SUBMIT: { bg: 'bg-indigo-100', text: 'text-indigo-700' },
+      SUBMIT: { bg: 'bg-slate-100', text: 'text-slate-700' },
       APPROVE: { bg: 'bg-emerald-100', text: 'text-emerald-700' },
       REJECT: { bg: 'bg-rose-100', text: 'text-rose-700' },
       EDIT: { bg: 'bg-amber-100', text: 'text-amber-700' },
-      RESEND: { bg: 'bg-purple-100', text: 'text-purple-700' },
-      CLOSE: { bg: 'bg-slate-100', text: 'text-slate-700' },
-      AUTO_APPROVE: { bg: 'bg-teal-100', text: 'text-teal-700' },
+      RESEND: { bg: 'bg-slate-100', text: 'text-slate-700' },
+      CLOSE: { bg: 'bg-slate-100', text: 'text-slate-600' },
+      AUTO_APPROVE: { bg: 'bg-emerald-100', text: 'text-emerald-700' },
       EXPIRE_BOUNCE: { bg: 'bg-orange-100', text: 'text-orange-700' }
     };
 
@@ -303,17 +307,17 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
               <div
                 key={entry.id}
                 className={classNames(
-                  'group relative rounded-xl border-2 p-4 shadow-md hover:shadow-lg transition-all duration-300',
-                  isRecent ? 'border-purple-300 bg-gradient-to-br from-purple-50 to-pink-50' : 'border-slate-200 bg-white'
+                  'rounded-lg border p-4 shadow-sm',
+                  isRecent ? 'border-slate-300 bg-slate-50' : 'border-slate-200 bg-white'
                 )}
               >
                 {isRecent && (
-                  <div className="absolute -top-2 -right-2 px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full text-white text-xs font-bold shadow-lg">
+                  <div className="absolute -top-2 -right-2 px-2 py-1 bg-slate-700 rounded text-white text-xs font-semibold">
                     {language === 'ka' ? 'ახალი' : 'NEW'}
                   </div>
                 )}
                 <div className="flex items-start gap-3">
-                  <div className={classNames('px-3 py-1 rounded-lg font-bold text-xs uppercase shadow-md flex-shrink-0', colors.bg, colors.text)}>
+                  <div className={classNames('px-3 py-1 rounded font-semibold text-xs uppercase flex-shrink-0', colors.bg, colors.text)}>
                     {entry.action}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -321,20 +325,20 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
                       <div className="flex-1">
                         {actor && (
                           <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold shadow">
+                            <div className="w-6 h-6 rounded-full bg-slate-600 flex items-center justify-center text-white text-xs font-semibold">
                               {actor.name.charAt(0).toUpperCase()}
                             </div>
-                            <span className="text-sm font-semibold text-slate-700">{actor.name}</span>
+                            <span className="text-sm font-medium text-slate-800">{actor.name}</span>
                           </div>
                         )}
                       </div>
-                      <div className="text-xs text-slate-500 font-medium whitespace-nowrap">
+                      <div className="text-xs text-slate-500 whitespace-nowrap">
                         {formatDateTime(entry.at, language)}
                       </div>
                     </div>
                     {entry.comment && (
-                      <div className="mt-2 p-3 rounded-lg bg-slate-50 border border-slate-200">
-                        <p className="text-sm text-slate-700 leading-relaxed">{entry.comment}</p>
+                      <div className="mt-2 p-3 rounded bg-slate-50 border border-slate-200">
+                        <p className="text-sm text-slate-700">{entry.comment}</p>
                       </div>
                     )}
                   </div>
@@ -342,6 +346,114 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
               </div>
             );
           })}
+      </div>
+    );
+  };
+
+  const handlePrint = () => {
+    setIsPrintMode(true);
+    setTimeout(() => {
+      window.print();
+      setIsPrintMode(false);
+    }, 100);
+  };
+
+  const renderPrintView = (bundle: ApplicationBundle) => {
+    const requester = userById.get(bundle.application.requesterId);
+    const type = typeById.get(bundle.application.typeId);
+    const startDate = getFieldValue(bundle, 'start_date');
+    const endDate = getFieldValue(bundle, 'end_date');
+    const startTime = getFieldValue(bundle, 'start_time');
+    const endTime = getFieldValue(bundle, 'end_time');
+    const reasonValue = getFieldValue(bundle, 'reason');
+    const commentValue = getFieldValue(bundle, 'additional_comment');
+    const extraFields = type
+      ? type.fields.filter((field) => !BUILT_IN_FIELD_KEYS.has(field.key))
+      : [];
+
+    const formatDateSegment = (date?: string, time?: string) => {
+      if (!date) return '—';
+      const formattedDate = formatDate(date, language);
+      return time ? `${formattedDate} • ${time}` : formattedDate;
+    };
+
+    return (
+      <div ref={printRef} className="print:block hidden">
+        <div className="max-w-4xl mx-auto p-8 bg-white">
+          {/* Header */}
+          <div className="border-b-2 border-slate-300 pb-4 mb-6">
+            <h1 className="text-2xl font-bold text-slate-900 mb-1">{printT.summaryTitle}</h1>
+            <div className="flex justify-between items-center">
+              <p className="text-lg font-semibold text-slate-700">{bundle.application.number}</p>
+              <p className="text-sm text-slate-600">{formatDateTime(bundle.application.createdAt, language)}</p>
+            </div>
+          </div>
+
+          {/* Basic Information */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div>
+              <p className="text-xs uppercase font-semibold text-slate-500 mb-1">{printT.requester}</p>
+              <p className="text-sm font-medium text-slate-900">{requester?.name ?? '—'}</p>
+              <p className="text-xs text-slate-600">{requester?.email ?? '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase font-semibold text-slate-500 mb-1">{printT.status}</p>
+              <p className="text-sm font-medium text-slate-900">{statusMeta.label[language]}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase font-semibold text-slate-500 mb-1">{t.modal.period}</p>
+              <p className="text-sm font-medium text-slate-900">
+                {formatDateSegment(startDate, startTime)} → {formatDateSegment(endDate, endTime)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase font-semibold text-slate-500 mb-1">{language === 'ka' ? 'ტიპი' : 'Type'}</p>
+              <p className="text-sm font-medium text-slate-900">{type?.description[language] ?? '—'}</p>
+            </div>
+          </div>
+
+          {/* Fields */}
+          <div className="mb-6">
+            <h2 className="text-sm uppercase font-semibold text-slate-700 mb-3 border-b border-slate-200 pb-2">{printT.fields}</h2>
+            <div className="space-y-3">
+              {reasonValue && reasonValue.trim() && (
+                <div>
+                  <p className="text-xs uppercase font-semibold text-slate-500 mb-1">{language === 'ka' ? 'მიზანი' : 'Purpose'}</p>
+                  <p className="text-sm text-slate-900">{reasonValue}</p>
+                </div>
+              )}
+              {extraFields.map((field) => {
+                const value = getFieldValue(bundle, field.key);
+                return (
+                  <div key={field.key}>
+                    <p className="text-xs uppercase font-semibold text-slate-500 mb-1">{field.label[language]}</p>
+                    <p className="text-sm text-slate-900">{value && value.trim() ? value : '—'}</p>
+                  </div>
+                );
+              })}
+              {commentValue?.trim() && (
+                <div>
+                  <p className="text-xs uppercase font-semibold text-slate-500 mb-1">{t.modal.comment}</p>
+                  <p className="text-sm text-slate-900">{commentValue}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Attachments */}
+          {bundle.attachments.length > 0 && (
+            <div>
+              <h2 className="text-sm uppercase font-semibold text-slate-700 mb-3 border-b border-slate-200 pb-2">{printT.attachments}</h2>
+              <ul className="space-y-1">
+                {bundle.attachments.map((attachment) => (
+                  <li key={attachment.id} className="text-sm text-slate-700">
+                    • {attachment.name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -376,69 +488,56 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
     };
 
     return (
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-        <div className="group relative rounded-2xl bg-gradient-to-br from-sky-50 to-blue-50 p-5 shadow-lg border-2 border-sky-100 hover:border-sky-300 hover:shadow-xl transition-all duration-300">
-          <div className="absolute top-3 right-3 w-20 h-20 bg-sky-200/30 rounded-full blur-2xl"></div>
-          <div className="relative">
-            <p className="text-xs uppercase tracking-wider font-bold text-sky-600 mb-2">{t.modal.requester}</p>
-            <p className="font-bold text-slate-800 text-lg mb-1">{requester?.name ?? '—'}</p>
-            <p className="text-sm text-slate-600 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
-              {requester?.email ?? '—'}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="rounded-lg bg-white p-5 border border-slate-200 shadow-sm">
+          <p className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">{t.modal.requester}</p>
+          <p className="font-semibold text-slate-900 text-base mb-1">{requester?.name ?? '—'}</p>
+          <p className="text-sm text-slate-600">{requester?.email ?? '—'}</p>
+        </div>
+
+        <div className="rounded-lg bg-white p-5 border border-slate-200 shadow-sm">
+          <p className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">{t.modal.created}</p>
+          <p className="font-semibold text-slate-900 text-base mb-2">{formatDateTime(bundle.application.createdAt, language)}</p>
+          {bundle.application.dueAt && (
+            <div className="text-sm text-slate-700 mt-2 bg-slate-100 rounded px-3 py-1.5 inline-block">
+              <div className="font-medium">SLA: {formatDateTime(bundle.application.dueAt, language)}</div>
+              <div className="text-xs">{formatRemainingTime(bundle.application.dueAt, language)}</div>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-lg bg-white p-5 border border-slate-200 shadow-sm">
+          <p className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">{t.modal.period}</p>
+          {(startDate || endDate) ? (
+            <p className="font-semibold text-slate-900 text-base leading-relaxed mb-2">
+              {formatDateSegment(startDate, startTime)} → {formatDateSegment(endDate, endTime)}
             </p>
-          </div>
+          ) : (
+            <p className="font-semibold text-slate-500 text-base mb-2">—</p>
+          )}
+          {type && <p className="text-xs text-slate-600 bg-slate-100 rounded px-2 py-1 inline-block">{type.description[language]}</p>}
         </div>
 
-        <div className="group relative rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 p-5 shadow-lg border-2 border-amber-100 hover:border-amber-300 hover:shadow-xl transition-all duration-300">
-          <div className="absolute top-3 right-3 w-20 h-20 bg-amber-200/30 rounded-full blur-2xl"></div>
-          <div className="relative">
-            <p className="text-xs uppercase tracking-wider font-bold text-amber-600 mb-2">{t.modal.created}</p>
-            <p className="font-bold text-slate-800 text-base mb-2">{formatDateTime(bundle.application.createdAt, language)}</p>
-            {bundle.application.dueAt && (
-              <div className="text-sm text-amber-700 mt-2 bg-amber-100 rounded-lg px-3 py-1.5 inline-block">
-                <div className="font-semibold">SLA: {formatDateTime(bundle.application.dueAt, language)}</div>
-                <div className="text-xs font-medium">{formatRemainingTime(bundle.application.dueAt, language)}</div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="group relative rounded-2xl bg-gradient-to-br from-indigo-50 to-purple-50 p-5 shadow-lg border-2 border-indigo-100 hover:border-indigo-300 hover:shadow-xl transition-all duration-300">
-          <div className="absolute top-3 right-3 w-20 h-20 bg-indigo-200/30 rounded-full blur-2xl"></div>
-          <div className="relative">
-            <p className="text-xs uppercase tracking-wider font-bold text-indigo-600 mb-2">{t.modal.period}</p>
-            {(startDate || endDate) ? (
-              <p className="font-bold text-slate-800 text-base leading-relaxed mb-2">
-                {formatDateSegment(startDate, startTime)} → {formatDateSegment(endDate, endTime)}
-              </p>
-            ) : (
-              <p className="font-bold text-slate-500 text-base mb-2">—</p>
-            )}
-            {type && <p className="text-xs text-slate-600 bg-indigo-100 rounded px-2 py-1 inline-block">{type.description[language]}</p>}
-          </div>
-        </div>
-
-        <div className="group relative rounded-2xl bg-gradient-to-br from-rose-50 to-pink-50 p-5 shadow-lg border-2 border-rose-100 hover:border-rose-300 hover:shadow-xl transition-all duration-300">
-          <div className="absolute top-3 right-3 w-20 h-20 bg-rose-200/30 rounded-full blur-2xl"></div>
-          <div className="relative space-y-3">
-            <p className="text-xs uppercase tracking-wider font-bold text-rose-600">{language === 'ka' ? 'დეტალები' : 'DETAILS'}</p>
+        <div className="rounded-lg bg-white p-5 border border-slate-200 shadow-sm">
+          <div className="space-y-3">
+            <p className="text-xs uppercase tracking-wider font-semibold text-slate-500">{language === 'ka' ? 'დეტალები' : 'DETAILS'}</p>
             {reasonValue && reasonValue.trim() && (
-              <div className="bg-white rounded-lg p-3 border border-rose-100">
-                <span className="text-xs uppercase tracking-wider text-rose-500 font-semibold block mb-1">{language === 'ka' ? 'მიზანი' : 'Purpose'}</span>
-                <p className="font-semibold text-slate-800 text-sm">{reasonValue}</p>
+              <div className="bg-slate-50 rounded p-3 border border-slate-200">
+                <span className="text-xs uppercase tracking-wider text-slate-600 font-medium block mb-1">{language === 'ka' ? 'მიზანი' : 'Purpose'}</span>
+                <p className="font-medium text-slate-900 text-sm">{reasonValue}</p>
               </div>
             )}
             {extraFieldEntries.map((entry) => (
-              <div key={entry.key} className="bg-white rounded-lg p-3 border border-rose-100">
-                <span className="text-xs uppercase tracking-wider text-rose-500 font-semibold block mb-1">{entry.label}</span>
-                <div className="font-semibold text-slate-800 text-sm">
+              <div key={entry.key} className="bg-slate-50 rounded p-3 border border-slate-200">
+                <span className="text-xs uppercase tracking-wider text-slate-600 font-medium block mb-1">{entry.label}</span>
+                <div className="font-medium text-slate-900 text-sm">
                   {entry.value.trim() ? entry.value : '—'}
                 </div>
               </div>
             ))}
             {commentValue?.trim() && (
-              <div className="bg-white rounded-lg p-3 border border-rose-100">
-                <span className="text-xs uppercase tracking-wider text-rose-500 font-semibold block mb-1">{t.modal.comment}</span>
+              <div className="bg-slate-50 rounded p-3 border border-slate-200">
+                <span className="text-xs uppercase tracking-wider text-slate-600 font-medium block mb-1">{t.modal.comment}</span>
                 <p className="text-slate-700 text-sm">{commentValue}</p>
               </div>
             )}
@@ -453,36 +552,37 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-gradient-to-br from-slate-900/80 via-purple-900/80 to-slate-900/80 backdrop-blur-sm px-4">
-      <div className="w-full max-w-6xl rounded-3xl bg-gradient-to-br from-white to-slate-50 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
-        {/* Modern Header with Gradient */}
-        <div className="relative bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 px-8 py-6 overflow-hidden">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjEiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-30"></div>
+    <>
+      {renderPrintView(selected)}
+      <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 print:hidden">
+        <div className="w-full max-w-6xl rounded-2xl bg-white shadow-xl overflow-hidden">
+        {/* Professional Header */}
+        <div className="relative bg-slate-700 px-8 py-6">
           <div className="relative flex items-start justify-between">
             <div className="flex-1">
               <div className="mb-3">
-                <p className="text-white/80 text-sm font-medium tracking-wider uppercase mb-2">{type?.name[language]}</p>
-                <h2 className="text-4xl font-bold text-white tracking-tight">{selected.application.number}</h2>
+                <p className="text-slate-300 text-sm font-medium uppercase mb-2">{type?.name[language]}</p>
+                <h2 className="text-3xl font-bold text-white">{selected.application.number}</h2>
               </div>
-              <p className="text-white/70 text-sm">
+              <p className="text-slate-300 text-sm">
                 {formatDateTime(selected.application.createdAt, language)}
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <span className={classNames('flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold bg-white/95 backdrop-blur-md shadow-lg border border-white/50', statusMeta.color)}>
+              <span className={classNames('flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold shadow-sm', statusMeta.color)}>
                 {statusMeta.icon}
                 {statusMeta.label[language]}
               </span>
               <button
                 type="button"
-                className="rounded-xl p-2.5 bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-all border border-white/30 shadow-lg"
-                onClick={onPrint}
+                className="rounded-lg p-2.5 bg-slate-600 text-white hover:bg-slate-500 transition-colors"
+                onClick={handlePrint}
               >
                 <Printer className="h-5 w-5" />
               </button>
               <button
                 type="button"
-                className="rounded-xl p-2.5 bg-white/20 backdrop-blur-md text-white hover:bg-rose-500 hover:bg-opacity-90 transition-all border border-white/30 shadow-lg"
+                className="rounded-lg p-2.5 bg-slate-600 text-white hover:bg-rose-600 transition-colors"
                 onClick={onClose}
               >
                 <X className="h-5 w-5" />
@@ -491,7 +591,7 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
           </div>
         </div>
 
-        <div className="max-h-[75vh] overflow-y-auto px-8 py-6 bg-gradient-to-br from-slate-50 to-white">
+        <div className="max-h-[75vh] overflow-y-auto px-8 py-6 bg-slate-50">
           <div className="space-y-6">
             {/* Enhanced Stepper */}
             <div className="relative">
@@ -502,36 +602,28 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
             {renderSummary(selected)}
 
             {/* Attachments and History Grid */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div className="group relative rounded-2xl border-2 border-slate-200 bg-white p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:border-indigo-300">
-                <div className="absolute -top-4 left-6 px-4 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full shadow-lg">
-                  <h3 className="text-sm font-bold text-white">
-                    {t.modal.attachments}
-                  </h3>
-                </div>
-                <div className="mt-4">
-                  {renderAttachments(selected)}
-                </div>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <h3 className="text-sm font-semibold text-slate-700 mb-4 uppercase tracking-wider">
+                  {t.modal.attachments}
+                </h3>
+                {renderAttachments(selected)}
               </div>
-              <div className="group relative rounded-2xl border-2 border-slate-200 bg-white p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:border-purple-300">
-                <div className="absolute -top-4 left-6 px-4 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full shadow-lg">
-                  <h3 className="text-sm font-bold text-white">
-                    {t.modal.history}
-                  </h3>
-                </div>
-                <div className="mt-4">
-                  {renderAuditTrail(selected)}
-                </div>
+              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <h3 className="text-sm font-semibold text-slate-700 mb-4 uppercase tracking-wider">
+                  {t.modal.history}
+                </h3>
+                {renderAuditTrail(selected)}
               </div>
             </div>
 
             {actionMessage && (
-              <div className="rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200 px-5 py-4 text-emerald-700 font-medium shadow-lg">
+              <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-emerald-700 font-medium">
                 {actionMessage}
               </div>
             )}
             {actionError && (
-              <div className="rounded-2xl bg-gradient-to-r from-rose-50 to-red-50 border-2 border-rose-200 px-5 py-4 text-rose-700 font-medium shadow-lg">
+              <div className="rounded-lg bg-rose-50 border border-rose-200 px-4 py-3 text-rose-700 font-medium">
                 {actionError}
               </div>
             )}
@@ -703,6 +795,7 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
