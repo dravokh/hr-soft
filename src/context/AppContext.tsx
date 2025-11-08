@@ -16,21 +16,14 @@ import {
   ApplicationType,
   Attachment,
   AuditLog,
+  CompensationBonus,
+  CompensationBonusInput,
   LoginResult,
   Role,
-  Session,
   User
 } from '../types';
-import { storage } from '../utils/storage';
 import { runSlaAutomation } from './app/automation';
 import { syncCounters } from './app/counters';
-import {
-  DEFAULT_APPLICATIONS,
-  DEFAULT_APPLICATION_TYPES,
-  DEFAULT_ROLES,
-  DEFAULT_USERS,
-  StoredUser
-} from './app/defaults';
 import { createApplicationMutations } from './app/mutations';
 import {
   buildApplicationNumber,
@@ -40,7 +33,39 @@ import {
   normalizeApplications
 } from './app/normalizers';
 import { ensureAdminPermissions } from './app/permissions';
-import { STORAGE_KEYS } from './app/storageKeys';
+import {
+  apiEnabled,
+  fetchBootstrap,
+  syncApplications,
+  syncApplicationTypes,
+  syncRoles,
+  syncUsers,
+  syncCompensationBonuses
+} from '../services/api';
+
+const normalizeBonusTree = (nodes: CompensationBonus[]): CompensationBonus[] =>
+  nodes.map((node) => ({
+    id: node.id,
+    parentId: node.parentId ?? null,
+    name: node.name?.trim() ?? '',
+    percent:
+      node.percent === null || node.percent === undefined || Number.isNaN(Number(node.percent))
+        ? null
+        : Number(node.percent),
+    children: normalizeBonusTree(node.children ?? [])
+  }));
+
+const sanitizeBonusInput = (nodes: CompensationBonusInput[]): CompensationBonusInput[] =>
+  nodes.map((node) => ({
+    id: node.id,
+    parentId: node.parentId ?? null,
+    name: node.name?.trim() ?? '',
+    percent:
+      node.percent === null || node.percent === undefined || Number.isNaN(Number(node.percent))
+        ? null
+        : Number(node.percent),
+    children: sanitizeBonusInput(node.children ?? [])
+  }));
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
@@ -49,6 +74,7 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
   const [users, setUsers] = useState<User[]>([]);
   const [applicationTypes, setApplicationTypes] = useState<ApplicationType[]>([]);
   const [applications, setApplications] = useState<ApplicationBundle[]>([]);
+  const [compensationBonuses, setCompensationBonuses] = useState<CompensationBonus[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -79,20 +105,128 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
     [applyApprove, applyReject]
   );
 
+  const normalizeUser = useCallback((user: User): User => {
+    const rawName = (user.name ?? '').trim();
+    const explicitFirst = user.firstName?.trim();
+    const explicitLast = user.lastName?.trim();
+    const phone = user.phone?.trim() ?? '';
+    const personalId = user.personalId?.trim() ?? '';
+    const mustResetPassword = Boolean(user.mustResetPassword);
+    const baseSalary = Number.isFinite(Number(user.baseSalary)) ? Number(user.baseSalary) : 0;
+    const vacationDays = Number.isFinite(Number(user.vacationDays)) ? Number(user.vacationDays) : 0;
+    const lateHoursAllowed = Number.isFinite(Number(user.lateHoursAllowed))
+      ? Number(user.lateHoursAllowed)
+      : 0;
+    const penaltyPercent = Number.isFinite(Number(user.penaltyPercent)) ? Number(user.penaltyPercent) : 0;
+    const selectedBonusIds = Array.isArray(user.selectedBonusIds)
+      ? Array.from(
+          new Set(
+            user.selectedBonusIds
+              .map((bonusId) => Number(bonusId))
+              .filter((bonusId) => Number.isFinite(bonusId) && bonusId > 0)
+          )
+        )
+      : [];
+
+    if (explicitFirst || explicitLast) {
+      return {
+        ...user,
+        firstName: explicitFirst ?? '',
+        lastName: explicitLast ?? '',
+        name: [explicitFirst, explicitLast].filter((part) => part && part.length > 0).join(' ').trim(),
+        phone,
+        personalId,
+        mustResetPassword,
+        baseSalary,
+        vacationDays,
+        lateHoursAllowed,
+        penaltyPercent,
+        selectedBonusIds
+      };
+    }
+
+    if (!rawName) {
+      return {
+        ...user,
+        firstName: '',
+        lastName: '',
+        phone,
+        personalId,
+        mustResetPassword,
+        baseSalary,
+        vacationDays,
+        lateHoursAllowed,
+        penaltyPercent,
+        selectedBonusIds
+      };
+    }
+
+    const segments = rawName.split(' ').filter(Boolean);
+    const firstName = segments[0] ?? '';
+    const lastName = segments.slice(1).join(' ');
+
+    return {
+      ...user,
+      firstName,
+      lastName,
+      phone,
+      personalId,
+      mustResetPassword,
+      baseSalary,
+      vacationDays,
+      lateHoursAllowed,
+      penaltyPercent,
+      selectedBonusIds
+    };
+  }, []);
+
+  const serializeUsers = useCallback(
+    (rawUsers: User[]): User[] =>
+      rawUsers.map((user) => {
+        const firstName = user.firstName?.trim() ?? '';
+        const lastName = user.lastName?.trim() ?? '';
+        const name = [firstName, lastName].filter(Boolean).join(' ').trim();
+        const phone = user.phone?.trim() ?? '';
+        const personalId = user.personalId?.trim() ?? '';
+        const baseSalary = Number.isFinite(Number(user.baseSalary)) ? Number(user.baseSalary) : 0;
+        const vacationDays = Number.isFinite(Number(user.vacationDays)) ? Number(user.vacationDays) : 0;
+        const lateHoursAllowed = Number.isFinite(Number(user.lateHoursAllowed))
+          ? Number(user.lateHoursAllowed)
+          : 0;
+        const penaltyPercent = Number.isFinite(Number(user.penaltyPercent)) ? Number(user.penaltyPercent) : 0;
+        const selectedBonusIds = Array.isArray(user.selectedBonusIds)
+          ? Array.from(
+              new Set(
+                user.selectedBonusIds
+                  .map((bonusId) => Number(bonusId))
+                  .filter((bonusId) => Number.isFinite(bonusId) && bonusId > 0)
+              )
+            )
+          : [];
+
+        return {
+          ...user,
+          name: name || user.name || '',
+          firstName,
+          lastName,
+          phone,
+          personalId,
+          baseSalary,
+          vacationDays,
+          lateHoursAllowed,
+          penaltyPercent,
+          selectedBonusIds
+        };
+      }),
+    []
+  );
+
   const recomputeApplications = useCallback(
     (bundles: ApplicationBundle[], typesSource: ApplicationType[]) => {
       const normalized = normalizeApplications(bundles, typesSource);
-      const processed = applyAutomation(normalized, typesSource);
-      storage.set(STORAGE_KEYS.APPLICATIONS, processed);
-      syncCounters(processed, {
-        applicationIdRef,
-        attachmentIdRef,
-        auditIdRef,
-        delegateIdRef
-      });
-      return processed;
+      return applyAutomation(normalized, typesSource);
     },
-    [applyAutomation, applicationIdRef, attachmentIdRef, auditIdRef, delegateIdRef]
+    [applyAutomation]
   );
 
   const saveApplications = useCallback(
@@ -101,18 +235,35 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
         | ApplicationBundle[]
         | ((current: ApplicationBundle[]) => ApplicationBundle[])
     ): Promise<ApplicationBundle[]> => {
-      let processed: ApplicationBundle[] = [];
-      setApplications((previous) => {
-        const base =
-          typeof nextBundlesOrUpdater === 'function'
-            ? nextBundlesOrUpdater(previous)
-            : nextBundlesOrUpdater;
-        processed = recomputeApplications(base, applicationTypes);
-        return processed;
+      const base =
+        typeof nextBundlesOrUpdater === 'function'
+          ? nextBundlesOrUpdater(applications)
+          : nextBundlesOrUpdater;
+
+      const prepared = recomputeApplications(base, applicationTypes);
+      const persisted = apiEnabled ? await syncApplications(prepared) : prepared;
+      const processed = recomputeApplications(persisted, applicationTypes);
+
+      setApplications(processed);
+      syncCounters(processed, {
+        applicationIdRef,
+        attachmentIdRef,
+        auditIdRef,
+        delegateIdRef
       });
+
       return processed;
     },
-    [applicationTypes, recomputeApplications]
+    [
+      apiEnabled,
+      applications,
+      applicationTypes,
+      recomputeApplications,
+      applicationIdRef,
+      attachmentIdRef,
+      auditIdRef,
+      delegateIdRef
+    ]
   );
 
   const saveApplicationTypes = useCallback(
@@ -121,16 +272,36 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
       applicationUpdater?: (current: ApplicationBundle[]) => ApplicationBundle[]
     ): Promise<void> => {
       const normalized = normalizeApplicationTypeList(nextTypes);
+      const persisted = apiEnabled ? await syncApplicationTypes(normalized) : normalized;
+
       applicationTypeIdRef.current =
-        normalized.reduce((max, type) => Math.max(max, type.id), 0) + 1;
-      setApplicationTypes(normalized);
-      storage.set(STORAGE_KEYS.APPLICATION_TYPES, normalized);
-      setApplications((prev) => {
-        const base = applicationUpdater ? applicationUpdater(prev) : prev;
-        return recomputeApplications(base, normalized);
+        persisted.reduce((max, type) => Math.max(max, type.id), 0) + 1;
+      setApplicationTypes(persisted);
+
+      if (applicationUpdater) {
+        await saveApplications((current) => applicationUpdater(current));
+        return;
+      }
+
+      const processed = recomputeApplications(applications, persisted);
+      setApplications(processed);
+      syncCounters(processed, {
+        applicationIdRef,
+        attachmentIdRef,
+        auditIdRef,
+        delegateIdRef
       });
     },
-    [recomputeApplications]
+    [
+      apiEnabled,
+      applications,
+      recomputeApplications,
+      saveApplications,
+      applicationIdRef,
+      attachmentIdRef,
+      auditIdRef,
+      delegateIdRef
+    ]
   );
 
   const createApplicationType = useCallback(
@@ -176,32 +347,37 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
 
   const loadAllData = useCallback(async () => {
     setLoading(true);
+
     try {
-      const storedRoles = storage.get<Role[]>(STORAGE_KEYS.ROLES);
-      const resolvedRoles = ensureAdminPermissions(storedRoles ?? DEFAULT_ROLES);
+      if (!apiEnabled) {
+        throw new Error('API base URL is not configured');
+      }
+
+      const boot = await fetchBootstrap();
+
+      const resolvedRoles = ensureAdminPermissions(boot.roles ?? []);
       setRoles(resolvedRoles);
-      storage.set(STORAGE_KEYS.ROLES, resolvedRoles);
 
-      const storedUsers = storage.get<StoredUser[]>(STORAGE_KEYS.USERS);
-      const resolvedUsers: User[] = (storedUsers ?? DEFAULT_USERS).map((user) => ({
-        ...user,
-        phone: user.phone ?? ''
-      }));
+      const resolvedUsers: User[] = (boot.users ?? []).map((user) =>
+        normalizeUser({
+          ...user,
+          phone: user.phone ?? '',
+          personalId: user.personalId ?? '',
+          mustResetPassword: Boolean(user.mustResetPassword)
+        })
+      );
       setUsers(resolvedUsers);
-      storage.set(STORAGE_KEYS.USERS, resolvedUsers);
 
-      const storedTypes = storage.get<ApplicationType[]>(STORAGE_KEYS.APPLICATION_TYPES);
-      const resolvedTypes = normalizeApplicationTypeList(storedTypes ?? DEFAULT_APPLICATION_TYPES);
+      const resolvedTypes = normalizeApplicationTypeList(boot.applicationTypes ?? []);
       applicationTypeIdRef.current =
         resolvedTypes.reduce((max, type) => Math.max(max, type.id), 0) + 1;
       setApplicationTypes(resolvedTypes);
-      storage.set(STORAGE_KEYS.APPLICATION_TYPES, resolvedTypes);
 
-      const storedBundles = storage.get<ApplicationBundle[]>(STORAGE_KEYS.APPLICATIONS);
-      const normalizedBundles = normalizeApplications(storedBundles ?? DEFAULT_APPLICATIONS, resolvedTypes);
+      const normalizedBundles = normalizeApplications(boot.applications ?? [], resolvedTypes);
       const processedBundles = applyAutomation(normalizedBundles, resolvedTypes);
       setApplications(processedBundles);
-      storage.set(STORAGE_KEYS.APPLICATIONS, processedBundles);
+      const normalizedBonuses = normalizeBonusTree(boot.compensationBonuses ?? []);
+      setCompensationBonuses(normalizedBonuses);
       syncCounters(processedBundles, {
         applicationIdRef,
         attachmentIdRef,
@@ -209,72 +385,187 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
         delegateIdRef
       });
 
-      const session = storage.get<Session>(STORAGE_KEYS.SESSION);
-      if (session) {
-        const sessionUser = resolvedUsers.find((user) => user.id === session.userId) ?? null;
-        setCurrentUser(sessionUser);
-        setIsAuthenticated(Boolean(sessionUser));
-      } else {
-        setCurrentUser(null);
-        setIsAuthenticated(false);
-      }
+      setCurrentUser(null);
+      setIsAuthenticated(false);
+    } catch (error) {
+      console.error('Failed to load bootstrap data from API.', error);
+      setRoles([]);
+      setUsers([]);
+      setApplicationTypes([]);
+      setApplications([]);
+      setCompensationBonuses([]);
+      syncCounters([], {
+        applicationIdRef,
+        attachmentIdRef,
+        auditIdRef,
+        delegateIdRef
+      });
+      setCurrentUser(null);
+      setIsAuthenticated(false);
     } finally {
       setLoading(false);
     }
   }, [
+    apiEnabled,
     applyAutomation,
     applicationTypeIdRef,
     applicationIdRef,
     attachmentIdRef,
     auditIdRef,
-    delegateIdRef
+    delegateIdRef,
+    normalizeUser
   ]);
 
+  // Prevent double init in React 18 StrictMode (dev)
+  const initializedRef = useRef(false);
   useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
     void loadAllData();
   }, [loadAllData]);
 
   const login = useCallback(
     async (email: string, password: string): Promise<LoginResult> => {
+      if (!apiEnabled) {
+        return {
+          success: false,
+          error: 'API base URL is not configured. Set VITE_API_URL and restart the app.'
+        };
+      }
+
+      if (users.length === 0) {
+        return {
+          success: false,
+          error: 'No users are available. Verify the backend API and database connection.'
+        };
+      }
+
       const user = users.find((candidate) => candidate.email === email && candidate.password === password);
 
       if (!user) {
-        return { success: false, error: 'არასწორი ელ. ფოსტა ან პაროლი' };
+        return { success: false, error: 'Invalid email or password.' };
       }
 
-      const session: Session = { userId: user.id, timestamp: Date.now() };
-      storage.set(STORAGE_KEYS.SESSION, session);
+      if (user.mustResetPassword) {
+        setCurrentUser(user);
+        setIsAuthenticated(false);
+        return {
+          success: true,
+          requiresPasswordReset: true,
+          userId: user.id
+        };
+      }
+
       setCurrentUser(user);
       setIsAuthenticated(true);
 
       return { success: true };
     },
-    [users]
+    [apiEnabled, users]
   );
 
   const logout = useCallback(async (): Promise<void> => {
-    storage.remove(STORAGE_KEYS.SESSION);
     setCurrentUser(null);
     setIsAuthenticated(false);
   }, []);
 
   const saveRoles = useCallback(async (newRoles: Role[]): Promise<void> => {
     const nextRoles = ensureAdminPermissions(newRoles);
-    setRoles(nextRoles);
-    storage.set(STORAGE_KEYS.ROLES, nextRoles);
-  }, []);
+    const persisted = apiEnabled ? await syncRoles(nextRoles) : nextRoles;
+    setRoles(persisted);
+  }, [apiEnabled]);
 
-  const saveUsers = useCallback(async (newUsers: User[]): Promise<void> => {
-    setUsers(newUsers);
-    storage.set(STORAGE_KEYS.USERS, newUsers);
-    setCurrentUser((previous) => {
-      if (!previous) {
-        return previous;
+  const saveUsers = useCallback(
+    async (newUsers: User[]): Promise<void> => {
+      const payload = serializeUsers(newUsers);
+      const persistedRaw = apiEnabled ? await syncUsers(payload) : payload;
+      const persisted = persistedRaw.map((user) => normalizeUser(user));
+
+      setUsers(persisted);
+      setCurrentUser((previous) => {
+        if (!previous) {
+          return previous;
+        }
+
+        return persisted.find((user) => user.id === previous.id) ?? previous;
+      });
+    },
+    [apiEnabled, normalizeUser, serializeUsers]
+  );
+
+  const saveCompensationBonuses = useCallback(
+    async (bonuses: CompensationBonusInput[]): Promise<CompensationBonus[]> => {
+      const sanitized = sanitizeBonusInput(bonuses);
+      const persisted = apiEnabled
+        ? await syncCompensationBonuses(sanitized)
+        : (() => {
+            let sequence = 1;
+            const assignIds = (nodes: CompensationBonusInput[], parentId: number | null): CompensationBonus[] =>
+              nodes.map((node) => {
+                const currentId = node.id && node.id > 0 ? node.id : sequence++;
+                return {
+                  id: currentId,
+                  parentId,
+                  name: node.name,
+                  percent: node.percent,
+                  children: assignIds(node.children ?? [], currentId)
+                };
+              });
+            return assignIds(sanitized, null);
+          })();
+
+      const normalized = normalizeBonusTree(persisted);
+      setCompensationBonuses(normalized);
+      return normalized;
+    },
+    [apiEnabled]
+  );
+
+  const completePasswordReset = useCallback(
+    async (userId: number, newPassword: string): Promise<boolean> => {
+      const trimmed = newPassword.trim();
+      if (trimmed === '') {
+        return false;
       }
 
-      return newUsers.find((user) => user.id === previous.id) ?? previous;
-    });
-  }, []);
+      const target = users.find((user) => user.id === userId);
+      if (!target) {
+        return false;
+      }
+
+      const updatedUsers = users.map((user) =>
+        user.id === userId ? { ...user, password: trimmed, mustResetPassword: false } : user
+      );
+
+      await saveUsers(updatedUsers);
+      setIsAuthenticated(true);
+      return true;
+    },
+    [saveUsers, users]
+  );
+
+  const resetUserPassword = useCallback(
+    async (userId: number): Promise<boolean> => {
+      const target = users.find((user) => user.id === userId);
+      if (!target) {
+        return false;
+      }
+
+      const updatedUsers = users.map((user) =>
+        user.id === userId
+          ? {
+              ...user,
+              password: '123',
+              mustResetPassword: true
+            }
+          : user
+      );
+
+      await saveUsers(updatedUsers);
+      return true;
+    },
+    [saveUsers, users]
+  );
 
   const createApplication = useCallback(
     async (
@@ -567,6 +858,7 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
     () => ({
       roles,
       users,
+      compensationBonuses,
       currentUser,
       isAuthenticated,
       loading,
@@ -577,6 +869,9 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
       loadAllData,
       saveRoles,
       saveUsers,
+      saveCompensationBonuses,
+      resetUserPassword,
+      completePasswordReset,
       saveApplicationTypes,
       saveApplications,
       createApplicationType,
@@ -596,6 +891,7 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
     [
       roles,
       users,
+      compensationBonuses,
       currentUser,
       isAuthenticated,
       loading,
@@ -606,6 +902,9 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
       loadAllData,
       saveRoles,
       saveUsers,
+      saveCompensationBonuses,
+      resetUserPassword,
+      completePasswordReset,
       saveApplicationTypes,
       saveApplications,
       createApplicationType,
@@ -634,3 +933,4 @@ export const useAppContext = (): AppContextValue => {
   }
   return context;
 };
+

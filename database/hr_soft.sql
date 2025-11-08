@@ -1,10 +1,12 @@
--- ------------------------------------------------------
+﻿-- ------------------------------------------------------
 -- HR Soft demo database
 -- Ready for import in phpMyAdmin or MySQL-compatible tools
 -- ------------------------------------------------------
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 SET time_zone = "+00:00";
+SET NAMES utf8mb4;
+SET CHARACTER SET utf8mb4;
 
 START TRANSACTION;
 
@@ -23,6 +25,8 @@ DROP TABLE IF EXISTS `application_type_fields`;
 DROP TABLE IF EXISTS `application_types`;
 DROP TABLE IF EXISTS `sessions`;
 DROP TABLE IF EXISTS `tickets`;
+DROP TABLE IF EXISTS `user_compensation_bonuses`;
+DROP TABLE IF EXISTS `compensation_bonuses`;
 DROP TABLE IF EXISTS `role_permissions`;
 DROP TABLE IF EXISTS `users`;
 DROP TABLE IF EXISTS `permissions`;
@@ -37,9 +41,9 @@ CREATE TABLE `roles` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `roles` (`id`, `name`, `description`) VALUES
-  (1, 'Admin', 'სისტემის ადმინისტრატორი'),
-  (2, 'HR', 'HR მენეჯერი'),
-  (3, 'Employee', 'თანამშრომელი');
+  (1, 'Admin', 'ßâíßâÿßâíßâóßâößâ¢ßâÿßâí ßâÉßâôßâ¢ßâÿßâ£ßâÿßâíßâóßâáßâÉßâóßâ¥ßâáßâÿ'),
+  (2, 'HR', 'HR ßâ¢ßâößâ£ßâößâ»ßâößâáßâÿ'),
+  (3, 'Employee', 'ßâùßâÉßâ£ßâÉßâ¢ßâ¿ßâáßâ¥ßâ¢ßâößâÜßâÿ');
 
 -- Permission catalog
 CREATE TABLE `permissions` (
@@ -50,24 +54,24 @@ CREATE TABLE `permissions` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `permissions` (`id`, `name`, `category`) VALUES
-  ('view_dashboard', 'მთავარი გვერდის ნახვა', 'Dashboard'),
-  ('view_users', 'მომხმარებლების ნახვა', 'Users'),
-  ('create_users', 'მომხმარებლების შექმნა', 'Users'),
-  ('edit_users', 'მომხმარებლების რედაქტირება', 'Users'),
-  ('delete_users', 'მომხმარებლების წაშლა', 'Users'),
-  ('view_roles', 'როლების ნახვა', 'Roles'),
-  ('create_roles', 'როლების შექმნა', 'Roles'),
-  ('edit_roles', 'როლების რედაქტირება', 'Roles'),
-  ('delete_roles', 'როლების წაშლა', 'Roles'),
-  ('view_requests', 'მოთხოვნების ნახვა', 'Requests'),
-  ('create_requests', 'მოთხოვნების შექმნა', 'Requests'),
-  ('approve_requests', 'მოთხოვნების დამტკიცება', 'Requests'),
-  ('view_tickets', 'სერვის თიკეტების ნახვა', 'Tickets'),
-  ('create_tickets', 'სერვის თიკეტების შექმნა', 'Tickets'),
-  ('update_tickets', 'სერვის თიკეტების განახლება', 'Tickets'),
-  ('set_ticket_priority', 'თიკეტების პრიორიტეტების მართვა', 'Tickets'),
-  ('manage_request_types', 'განაცხადების ტიპების მართვა', 'Requests'),
-  ('manage_permissions', 'უფლებების მართვა', 'System');
+  ('view_dashboard', 'ßâ¢ßâùßâÉßâòßâÉßâáßâÿ ßâÆßâòßâößâáßâôßâÿßâí ßâ£ßâÉßâ«ßâòßâÉ', 'Dashboard'),
+  ('view_users', 'ßâ¢ßâ¥ßâ¢ßâ«ßâ¢ßâÉßâáßâößâæßâÜßâößâæßâÿßâí ßâ£ßâÉßâ«ßâòßâÉ', 'Users'),
+  ('create_users', 'ßâ¢ßâ¥ßâ¢ßâ«ßâ¢ßâÉßâáßâößâæßâÜßâößâæßâÿßâí ßâ¿ßâößâÑßâ¢ßâ£ßâÉ', 'Users'),
+  ('edit_users', 'ßâ¢ßâ¥ßâ¢ßâ«ßâ¢ßâÉßâáßâößâæßâÜßâößâæßâÿßâí ßâáßâößâôßâÉßâÑßâóßâÿßâáßâößâæßâÉ', 'Users'),
+  ('delete_users', 'ßâ¢ßâ¥ßâ¢ßâ«ßâ¢ßâÉßâáßâößâæßâÜßâößâæßâÿßâí ßâ¼ßâÉßâ¿ßâÜßâÉ', 'Users'),
+  ('view_roles', 'ßâáßâ¥ßâÜßâößâæßâÿßâí ßâ£ßâÉßâ«ßâòßâÉ', 'Roles'),
+  ('create_roles', 'ßâáßâ¥ßâÜßâößâæßâÿßâí ßâ¿ßâößâÑßâ¢ßâ£ßâÉ', 'Roles'),
+  ('edit_roles', 'ßâáßâ¥ßâÜßâößâæßâÿßâí ßâáßâößâôßâÉßâÑßâóßâÿßâáßâößâæßâÉ', 'Roles'),
+  ('delete_roles', 'ßâáßâ¥ßâÜßâößâæßâÿßâí ßâ¼ßâÉßâ¿ßâÜßâÉ', 'Roles'),
+  ('view_requests', 'ßâ¢ßâ¥ßâùßâ«ßâ¥ßâòßâ£ßâößâæßâÿßâí ßâ£ßâÉßâ«ßâòßâÉ', 'Requests'),
+  ('create_requests', 'ßâ¢ßâ¥ßâùßâ«ßâ¥ßâòßâ£ßâößâæßâÿßâí ßâ¿ßâößâÑßâ¢ßâ£ßâÉ', 'Requests'),
+  ('approve_requests', 'ßâ¢ßâ¥ßâùßâ«ßâ¥ßâòßâ£ßâößâæßâÿßâí ßâôßâÉßâ¢ßâóßâÖßâÿßâ¬ßâößâæßâÉ', 'Requests'),
+  ('view_tickets', 'ßâíßâößâáßâòßâÿßâí ßâùßâÿßâÖßâößâóßâößâæßâÿßâí ßâ£ßâÉßâ«ßâòßâÉ', 'Tickets'),
+  ('create_tickets', 'ßâíßâößâáßâòßâÿßâí ßâùßâÿßâÖßâößâóßâößâæßâÿßâí ßâ¿ßâößâÑßâ¢ßâ£ßâÉ', 'Tickets'),
+  ('update_tickets', 'ßâíßâößâáßâòßâÿßâí ßâùßâÿßâÖßâößâóßâößâæßâÿßâí ßâÆßâÉßâ£ßâÉßâ«ßâÜßâößâæßâÉ', 'Tickets'),
+  ('set_ticket_priority', 'ßâùßâÿßâÖßâößâóßâößâæßâÿßâí ßâ₧ßâáßâÿßâ¥ßâáßâÿßâóßâößâóßâößâæßâÿßâí ßâ¢ßâÉßâáßâùßâòßâÉ', 'Tickets'),
+  ('manage_request_types', 'ßâÆßâÉßâ£ßâÉßâ¬ßâ«ßâÉßâôßâößâæßâÿßâí ßâóßâÿßâ₧ßâößâæßâÿßâí ßâ¢ßâÉßâáßâùßâòßâÉ', 'Requests'),
+  ('manage_permissions', 'ßâúßâñßâÜßâößâæßâößâæßâÿßâí ßâ¢ßâÉßâáßâùßâòßâÉ', 'System');
 
 -- Junction table linking roles to their permissions
 CREATE TABLE `role_permissions` (
@@ -109,11 +113,19 @@ INSERT INTO `role_permissions` (`role_id`, `permission_id`) VALUES
 CREATE TABLE `users` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `name` VARCHAR(150) NOT NULL,
+  `first_name` VARCHAR(100) DEFAULT NULL,
+  `last_name` VARCHAR(100) DEFAULT NULL,
   `email` VARCHAR(150) NOT NULL,
   `phone` VARCHAR(30) NOT NULL,
+  `personal_id` VARCHAR(20) NOT NULL,
   `password` VARCHAR(255) NOT NULL,
+  `base_salary` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `vacation_days` INT NOT NULL DEFAULT 24,
+  `late_hours_allowed` INT NOT NULL DEFAULT 4,
+  `penalty_percent` DECIMAL(5,2) NOT NULL DEFAULT 0.00,
   `role_id` INT NOT NULL,
   `avatar` VARCHAR(5) NOT NULL,
+  `must_reset_password` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `email_unique` (`email`),
   CONSTRAINT `users_role_id_fk`
@@ -121,13 +133,69 @@ CREATE TABLE `users` (
     ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO `users` (`id`, `name`, `email`, `phone`, `password`, `role_id`, `avatar`) VALUES
-  (1, 'Admin User', 'admin@hr.com', '+995 555 000 001', 'admin123', 1, 'A'),
-  (2, 'HR Manager', 'hr@hr.com', '+995 555 000 002', 'hr123', 2, 'H'),
-  (3, 'Employee User', 'user@hr.com', '+995 555 000 003', 'user123', 3, 'E');
+CREATE TABLE `compensation_bonuses` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `parent_id` INT DEFAULT NULL,
+  `name` VARCHAR(255) NOT NULL,
+  `percent` DECIMAL(5,2) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  CONSTRAINT `compensation_bonuses_parent_fk`
+    FOREIGN KEY (`parent_id`) REFERENCES `compensation_bonuses` (`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `user_compensation_bonuses` (
+  `user_id` INT NOT NULL,
+  `bonus_id` INT NOT NULL,
+  PRIMARY KEY (`user_id`, `bonus_id`),
+  CONSTRAINT `ucb_user_fk`
+    FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `ucb_bonus_fk`
+    FOREIGN KEY (`bonus_id`) REFERENCES `compensation_bonuses` (`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `users` (
+  `id`,
+  `name`,
+  `first_name`,
+  `last_name`,
+  `email`,
+  `phone`,
+  `personal_id`,
+  `password`,
+  `base_salary`,
+  `vacation_days`,
+  `late_hours_allowed`,
+  `penalty_percent`,
+  `role_id`,
+  `avatar`,
+  `must_reset_password`
+) VALUES
+  (1, 'Admin User', 'Admin', 'User', 'admin@hr.com', '+995 555 000 001', '01001000001', 'admin123', 4500.00, 24, 4, 2.00, 1, 'A', 0),
+  (2, 'HR Manager', 'HR', 'Manager', 'hr@hr.com', '+995 555 000 002', '01001000002', 'hr123', 3200.00, 24, 4, 1.00, 2, 'H', 0),
+  (3, 'Employee User', 'Employee', 'User', 'user@hr.com', '+995 555 000 003', '01001000003', 'user123', 2200.00, 24, 4, 0.00, 3, 'E', 0);
 
 ALTER TABLE `users`
   AUTO_INCREMENT = 4;
+
+INSERT INTO `compensation_bonuses` (`id`, `parent_id`, `name`, `percent`) VALUES
+  (1, NULL, 'განათლება', NULL),
+  (2, 1, 'ბაკალავრი', 5.00),
+  (3, 1, 'მაგისტრი', 10.00),
+  (4, 1, 'დოქტორი', 15.00),
+  (5, NULL, 'გამოცდილება', NULL),
+  (6, 5, '1-3 წელი', 5.00),
+  (7, 5, '3-5 წელი', 10.00),
+  (8, 5, '5+ წელი', 15.00);
+
+INSERT INTO `user_compensation_bonuses` (`user_id`, `bonus_id`) VALUES
+  (1, 4),
+  (1, 7),
+  (2, 3),
+  (2, 6),
+  (3, 2);
 
 -- Application catalog and records
 CREATE TABLE `application_types` (
@@ -142,8 +210,8 @@ CREATE TABLE `application_types` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `application_types` (`id`, `name_ka`, `name_en`, `description_ka`, `description_en`, `icon`, `color`) VALUES
-  (1, 'შვებულების განაცხადი', 'Leave request', 'დაგეგმილი ან უცაბედი შვებულებების დამტკიცების სამუშაო პრക്രესი.', 'Approval workflow for planned or urgent leave requests.', 'CalendarDays', 'bg-sky-500'),
-  (2, 'კომანდირების განაცხადი', 'Business trip request', 'კომანდირებასთან დაკავშირებული ხარჯებისა და დაგეგმვის დამტკიცება.', 'Approval for travel itineraries and budget expectations.', 'Plane', 'bg-indigo-500');
+  (1, 'ßâ¿ßâòßâößâæßâúßâÜßâößâæßâÿßâí ßâÆßâÉßâ£ßâÉßâ¬ßâ«ßâÉßâôßâÿ', 'Leave request', 'ßâôßâÉßâÆßâößâÆßâ¢ßâÿßâÜßâÿ ßâÉßâ£ ßâúßâ¬ßâÉßâæßâößâôßâÿ ßâ¿ßâòßâößâæßâúßâÜßâößâæßâößâæßâÿßâí ßâôßâÉßâ¢ßâóßâÖßâÿßâ¬ßâößâæßâÿßâí ßâíßâÉßâ¢ßâúßâ¿ßâÉßâ¥ ßâ₧ßâáα┤òα╡ìα┤░ßâößâíßâÿ.', 'Approval workflow for planned or urgent leave requests.', 'CalendarDays', 'bg-sky-500'),
+  (2, 'ßâÖßâ¥ßâ¢ßâÉßâ£ßâôßâÿßâáßâößâæßâÿßâí ßâÆßâÉßâ£ßâÉßâ¬ßâ«ßâÉßâôßâÿ', 'Business trip request', 'ßâÖßâ¥ßâ¢ßâÉßâ£ßâôßâÿßâáßâößâæßâÉßâíßâùßâÉßâ£ ßâôßâÉßâÖßâÉßâòßâ¿ßâÿßâáßâößâæßâúßâÜßâÿ ßâ«ßâÉßâáßâ»ßâößâæßâÿßâíßâÉ ßâôßâÉ ßâôßâÉßâÆßâößâÆßâ¢ßâòßâÿßâí ßâôßâÉßâ¢ßâóßâÖßâÿßâ¬ßâößâæßâÉ.', 'Approval for travel itineraries and budget expectations.', 'Plane', 'bg-indigo-500');
 
 CREATE TABLE `application_type_fields` (
   `id` INT NOT NULL AUTO_INCREMENT,
@@ -167,15 +235,15 @@ CREATE TABLE `application_type_fields` (
 INSERT INTO `application_type_fields`
   (`type_id`, `field_key`, `label_ka`, `label_en`, `field_type`, `is_required`, `placeholder_ka`, `placeholder_en`, `helper_ka`, `helper_en`)
 VALUES
-  (1, 'reason', 'შვებულების მიზეზი', 'Reason for leave', 'textarea', 1, 'მოკლედ აღწერეთ მიზეზი…', 'Describe the reason…', NULL, NULL),
-  (1, 'start_date', 'დაწყების თარიღი', 'Start date', 'date', 1, NULL, NULL, NULL, NULL),
-  (1, 'end_date', 'დასრულების თარიღი', 'End date', 'date', 1, NULL, NULL, NULL, NULL),
-  (1, 'contact_phone', 'საკონტაქტო ნომერი', 'Contact phone', 'text', 1, '+995 5XX XXX XXX', '+995 5XX XXX XXX', NULL, NULL),
-  (1, 'additional_comment', 'დამატებითი კომენტარი', 'Additional comment', 'textarea', 0, NULL, NULL, 'მიუთითეთ დამატებითი ინფორმაცია საჭიროების შემთხვევაში.', 'Provide extra context if needed.'),
-  (2, 'destination', 'დანიშნულების ადგილი', 'Destination', 'text', 1, 'მაგ. ბარსელონა, ესპანეთი', 'e.g. Barcelona, Spain', NULL, NULL),
-  (2, 'travel_dates', 'გზის თარიღები', 'Travel dates', 'date_range', 1, NULL, NULL, 'მიუთითეთ გამგზავრების და დაბრუნების დღეები.', 'Include departure and return dates.'),
-  (2, 'budget', 'დაგეგმილი ბიუჯეტი', 'Estimated budget', 'number', 1, 'მაგ: 2400', 'e.g. 2400', NULL, NULL),
-  (2, 'purpose', 'კომანდირების მიზანი', 'Purpose', 'textarea', 1, NULL, NULL, NULL, NULL);
+  (1, 'reason', 'ßâ¿ßâòßâößâæßâúßâÜßâößâæßâÿßâí ßâ¢ßâÿßâûßâößâûßâÿ', 'Reason for leave', 'textarea', 1, 'ßâ¢ßâ¥ßâÖßâÜßâößâô ßâÉßâªßâ¼ßâößâáßâößâù ßâ¢ßâÿßâûßâößâûßâÿΓÇª', 'Describe the reasonΓÇª', NULL, NULL),
+  (1, 'start_date', 'ßâôßâÉßâ¼ßâºßâößâæßâÿßâí ßâùßâÉßâáßâÿßâªßâÿ', 'Start date', 'date', 1, NULL, NULL, NULL, NULL),
+  (1, 'end_date', 'ßâôßâÉßâíßâáßâúßâÜßâößâæßâÿßâí ßâùßâÉßâáßâÿßâªßâÿ', 'End date', 'date', 1, NULL, NULL, NULL, NULL),
+  (1, 'contact_phone', 'ßâíßâÉßâÖßâ¥ßâ£ßâóßâÉßâÑßâóßâ¥ ßâ£ßâ¥ßâ¢ßâößâáßâÿ', 'Contact phone', 'text', 1, '+995 5XX XXX XXX', '+995 5XX XXX XXX', NULL, NULL),
+  (1, 'additional_comment', 'ßâôßâÉßâ¢ßâÉßâóßâößâæßâÿßâùßâÿ ßâÖßâ¥ßâ¢ßâößâ£ßâóßâÉßâáßâÿ', 'Additional comment', 'textarea', 0, NULL, NULL, 'ßâ¢ßâÿßâúßâùßâÿßâùßâößâù ßâôßâÉßâ¢ßâÉßâóßâößâæßâÿßâùßâÿ ßâÿßâ£ßâñßâ¥ßâáßâ¢ßâÉßâ¬ßâÿßâÉ ßâíßâÉßâ¡ßâÿßâáßâ¥ßâößâæßâÿßâí ßâ¿ßâößâ¢ßâùßâ«ßâòßâößâòßâÉßâ¿ßâÿ.', 'Provide extra context if needed.'),
+  (2, 'destination', 'ßâôßâÉßâ£ßâÿßâ¿ßâ£ßâúßâÜßâößâæßâÿßâí ßâÉßâôßâÆßâÿßâÜßâÿ', 'Destination', 'text', 1, 'ßâ¢ßâÉßâÆ. ßâæßâÉßâáßâíßâößâÜßâ¥ßâ£ßâÉ, ßâößâíßâ₧ßâÉßâ£ßâößâùßâÿ', 'e.g. Barcelona, Spain', NULL, NULL),
+  (2, 'travel_dates', 'ßâÆßâûßâÿßâí ßâùßâÉßâáßâÿßâªßâößâæßâÿ', 'Travel dates', 'date_range', 1, NULL, NULL, 'ßâ¢ßâÿßâúßâùßâÿßâùßâößâù ßâÆßâÉßâ¢ßâÆßâûßâÉßâòßâáßâößâæßâÿßâí ßâôßâÉ ßâôßâÉßâæßâáßâúßâ£ßâößâæßâÿßâí ßâôßâªßâößâößâæßâÿ.', 'Include departure and return dates.'),
+  (2, 'budget', 'ßâôßâÉßâÆßâößâÆßâ¢ßâÿßâÜßâÿ ßâæßâÿßâúßâ»ßâößâóßâÿ', 'Estimated budget', 'number', 1, 'ßâ¢ßâÉßâÆ: 2400', 'e.g. 2400', NULL, NULL),
+  (2, 'purpose', 'ßâÖßâ¥ßâ¢ßâÉßâ£ßâôßâÿßâáßâößâæßâÿßâí ßâ¢ßâÿßâûßâÉßâ£ßâÿ', 'Purpose', 'textarea', 1, NULL, NULL, NULL, NULL);
 
 CREATE TABLE `application_type_flow` (
   `type_id` INT NOT NULL,
@@ -255,15 +323,15 @@ CREATE TABLE `application_field_values` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `application_field_values` (`application_id`, `field_key`, `value`) VALUES
-  (1, 'reason', 'სწავლების კურსზე დასწრება'),
+  (1, 'reason', 'ßâíßâ¼ßâÉßâòßâÜßâößâæßâÿßâí ßâÖßâúßâáßâíßâûßâö ßâôßâÉßâíßâ¼ßâáßâößâæßâÉ'),
   (1, 'start_date', '2024-12-19'),
   (1, 'end_date', '2024-12-26'),
   (1, 'contact_phone', '+995 555 000 003'),
-  (1, 'additional_comment', 'საჭიროა შვებულება გამოცდების მზადებისთვის.'),
-  (2, 'destination', 'თბილისი → ტალინი'),
+  (1, 'additional_comment', 'ßâíßâÉßâ¡ßâÿßâáßâ¥ßâÉ ßâ¿ßâòßâößâæßâúßâÜßâößâæßâÉ ßâÆßâÉßâ¢ßâ¥ßâ¬ßâôßâößâæßâÿßâí ßâ¢ßâûßâÉßâôßâößâæßâÿßâíßâùßâòßâÿßâí.'),
+  (2, 'destination', 'ßâùßâæßâÿßâÜßâÿßâíßâÿ ΓåÆ ßâóßâÉßâÜßâÿßâ£ßâÿ'),
   (2, 'travel_dates', '2024-10-05/2024-10-11'),
   (2, 'budget', '3200'),
-  (2, 'purpose', 'HR ტექნოლოგიების კონფერენციაში მონაწილეობა.');
+  (2, 'purpose', 'HR ßâóßâößâÑßâ£ßâ¥ßâÜßâ¥ßâÆßâÿßâößâæßâÿßâí ßâÖßâ¥ßâ£ßâñßâößâáßâößâ£ßâ¬ßâÿßâÉßâ¿ßâÿ ßâ¢ßâ¥ßâ£ßâÉßâ¼ßâÿßâÜßâößâ¥ßâæßâÉ.');
 
 CREATE TABLE `application_attachments` (
   `id` INT NOT NULL AUTO_INCREMENT,
@@ -309,14 +377,14 @@ CREATE TABLE `application_audit_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `application_audit_log` (`id`, `application_id`, `actor_id`, `action`, `comment`, `occurred_at`) VALUES
-  (1, 1, 3, 'CREATE', 'შევსებულია განაცხადი და დაერთებულია მოწვევა.', '2024-10-28 08:20:00'),
-  (2, 1, 3, 'SUBMIT', 'გთხოვთ დამტკიცებას.', '2024-10-28 08:35:00'),
-  (3, 1, 1, 'APPROVE', 'დასვენება დამტკიცებულია, წარმატებები კურსზე.', '2024-10-29 09:05:00'),
-  (4, 1, 1, 'RESEND', 'დროებით გადაიგზავნა HR გუნდში.', '2024-10-29 09:06:00'),
+  (1, 1, 3, 'CREATE', 'ßâ¿ßâößâòßâíßâößâæßâúßâÜßâÿßâÉ ßâÆßâÉßâ£ßâÉßâ¬ßâ«ßâÉßâôßâÿ ßâôßâÉ ßâôßâÉßâößâáßâùßâößâæßâúßâÜßâÿßâÉ ßâ¢ßâ¥ßâ¼ßâòßâößâòßâÉ.', '2024-10-28 08:20:00'),
+  (2, 1, 3, 'SUBMIT', 'ßâÆßâùßâ«ßâ¥ßâòßâù ßâôßâÉßâ¢ßâóßâÖßâÿßâ¬ßâößâæßâÉßâí.', '2024-10-28 08:35:00'),
+  (3, 1, 1, 'APPROVE', 'ßâôßâÉßâíßâòßâößâ£ßâößâæßâÉ ßâôßâÉßâ¢ßâóßâÖßâÿßâ¬ßâößâæßâúßâÜßâÿßâÉ, ßâ¼ßâÉßâáßâ¢ßâÉßâóßâößâæßâößâæßâÿ ßâÖßâúßâáßâíßâûßâö.', '2024-10-29 09:05:00'),
+  (4, 1, 1, 'RESEND', 'ßâôßâáßâ¥ßâößâæßâÿßâù ßâÆßâÉßâôßâÉßâÿßâÆßâûßâÉßâòßâ£ßâÉ HR ßâÆßâúßâ£ßâôßâ¿ßâÿ.', '2024-10-29 09:06:00'),
   (5, 2, 2, 'CREATE', NULL, '2024-09-12 10:10:00'),
-  (6, 2, 2, 'SUBMIT', 'ბიუჯეტი მოიცავს ავიაბილეთებს და სასტუმროს.', '2024-09-12 10:25:00'),
-  (7, 2, 2, 'EDIT', 'განახლდა მისამართი და სასტუმროს მონაცემები.', '2024-09-13 09:12:00'),
-  (8, 2, 1, 'REJECT', 'გთხოვთ განახლებული ბიუჯეტის დეტალური დეკომპოზიცია.', '2024-09-15 14:32:00');
+  (6, 2, 2, 'SUBMIT', 'ßâæßâÿßâúßâ»ßâößâóßâÿ ßâ¢ßâ¥ßâÿßâ¬ßâÉßâòßâí ßâÉßâòßâÿßâÉßâæßâÿßâÜßâößâùßâößâæßâí ßâôßâÉ ßâíßâÉßâíßâóßâúßâ¢ßâáßâ¥ßâí.', '2024-09-12 10:25:00'),
+  (7, 2, 2, 'EDIT', 'ßâÆßâÉßâ£ßâÉßâ«ßâÜßâôßâÉ ßâ¢ßâÿßâíßâÉßâ¢ßâÉßâáßâùßâÿ ßâôßâÉ ßâíßâÉßâíßâóßâúßâ¢ßâáßâ¥ßâí ßâ¢ßâ¥ßâ£ßâÉßâ¬ßâößâ¢ßâößâæßâÿ.', '2024-09-13 09:12:00'),
+  (8, 2, 1, 'REJECT', 'ßâÆßâùßâ«ßâ¥ßâòßâù ßâÆßâÉßâ£ßâÉßâ«ßâÜßâößâæßâúßâÜßâÿ ßâæßâÿßâúßâ»ßâößâóßâÿßâí ßâôßâößâóßâÉßâÜßâúßâáßâÿ ßâôßâößâÖßâ¥ßâ¢ßâ₧ßâ¥ßâûßâÿßâ¬ßâÿßâÉ.', '2024-09-15 14:32:00');
 
 ALTER TABLE `application_audit_log`
   AUTO_INCREMENT = 9;

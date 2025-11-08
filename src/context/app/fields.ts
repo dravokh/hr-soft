@@ -101,6 +101,15 @@ export const buildFieldsForCapabilities = (
     fields.push(ensureField('end_time', { required: capabilities.timeRangeRequired ?? false }));
   }
 
+  // Include optional comment box when enabled via capabilities
+  if (capabilities.hasCommentField) {
+    fields.push(
+      ensureField('additional_comment', {
+        required: capabilities.commentRequired ?? false
+      })
+    );
+  }
+
   const customFields = base.filter((field) => !FIELD_KEYS.has(field.key));
   const seen = new Set(fields.map((field) => field.key));
   for (const field of customFields) {

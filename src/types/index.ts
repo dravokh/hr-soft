@@ -11,14 +11,39 @@ export interface Role {
   permissions: string[];
 }
 
+export interface CompensationBonus {
+  id: number;
+  parentId: number | null;
+  name: string;
+  percent: number | null;
+  children: CompensationBonus[];
+}
+
+export interface CompensationBonusInput {
+  id?: number;
+  parentId: number | null;
+  name: string;
+  percent: number | null;
+  children: CompensationBonusInput[];
+}
+
 export interface User {
   id: number;
   name: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   phone: string;
+  personalId: string;
   password: string;
   roleId: number;
   avatar: string;
+  mustResetPassword: boolean;
+  baseSalary?: number;
+  vacationDays?: number;
+  lateHoursAllowed?: number;
+  penaltyPercent?: number;
+  selectedBonusIds?: number[];
 }
 
 export type ApplicationStatus = 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CLOSED';
@@ -137,11 +162,14 @@ export interface Session {
 export interface LoginResult {
   success: boolean;
   error?: string;
+  requiresPasswordReset?: boolean;
+  userId?: number;
 }
 
 export interface AppContextValue {
   roles: Role[];
   users: User[];
+  compensationBonuses: CompensationBonus[];
   currentUser: User | null;
   isAuthenticated: boolean;
   loading: boolean;
@@ -152,6 +180,9 @@ export interface AppContextValue {
   loadAllData: () => Promise<void>;
   saveRoles: (roles: Role[]) => Promise<void>;
   saveUsers: (users: User[]) => Promise<void>;
+  saveCompensationBonuses: (bonuses: CompensationBonusInput[]) => Promise<CompensationBonus[]>;
+  resetUserPassword: (userId: number) => Promise<boolean>;
+  completePasswordReset: (userId: number, newPassword: string) => Promise<boolean>;
   saveApplications: (
     applications: ApplicationBundle[] | ((current: ApplicationBundle[]) => ApplicationBundle[])
   ) => Promise<ApplicationBundle[]>;

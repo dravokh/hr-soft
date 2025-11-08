@@ -45,7 +45,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
             <div className="flex items-center pb-6 border-b border-slate-700 mb-5">
               <div className="w-11 h-11 bg-blue-500 rounded-xl flex items-center justify-center mr-3 text-2xl">📊</div>
               <div>
-                <h2 className="text-lg font-semibold">HR მართვა</h2>
+                <h2 className="text-lg font-semibold">Maarif HR მართვა</h2>
                 <p className="text-xs text-slate-400">{userRole?.name ?? 'User'}</p>
               </div>
             </div>
