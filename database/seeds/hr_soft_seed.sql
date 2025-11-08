@@ -4,6 +4,7 @@ SET CHARACTER SET utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
 DELETE FROM user_compensation_bonuses;
+DELETE FROM user_work_schedules;
 DELETE FROM compensation_bonuses;
 DELETE FROM application_delegates;
 DELETE FROM application_audit_log;
@@ -123,6 +124,36 @@ INSERT INTO user_compensation_bonuses (user_id, bonus_id) VALUES
   (2, 3),
   (2, 6),
   (3, 2);
+
+INSERT INTO user_work_schedules (
+  user_id,
+  day_of_week,
+  is_working,
+  start_time,
+  end_time,
+  break_minutes
+) VALUES
+  (1, 'monday', 1, '09:00:00', '18:00:00', 60),
+  (1, 'tuesday', 1, '09:00:00', '18:00:00', 60),
+  (1, 'wednesday', 1, '09:00:00', '18:00:00', 60),
+  (1, 'thursday', 1, '09:00:00', '18:00:00', 60),
+  (1, 'friday', 1, '09:00:00', '18:00:00', 60),
+  (1, 'saturday', 0, NULL, NULL, 0),
+  (1, 'sunday', 0, NULL, NULL, 0),
+  (2, 'monday', 1, '09:00:00', '18:00:00', 60),
+  (2, 'tuesday', 1, '09:00:00', '18:00:00', 60),
+  (2, 'wednesday', 1, '09:00:00', '18:00:00', 60),
+  (2, 'thursday', 1, '09:00:00', '18:00:00', 60),
+  (2, 'friday', 1, '09:00:00', '18:00:00', 60),
+  (2, 'saturday', 0, NULL, NULL, 0),
+  (2, 'sunday', 0, NULL, NULL, 0),
+  (3, 'monday', 1, '10:00:00', '19:00:00', 45),
+  (3, 'tuesday', 1, '10:00:00', '19:00:00', 45),
+  (3, 'wednesday', 1, '10:00:00', '19:00:00', 45),
+  (3, 'thursday', 1, '10:00:00', '19:00:00', 45),
+  (3, 'friday', 1, '10:00:00', '19:00:00', 45),
+  (3, 'saturday', 0, NULL, NULL, 0),
+  (3, 'sunday', 0, NULL, NULL, 0);
 
 INSERT INTO application_types (
   id,

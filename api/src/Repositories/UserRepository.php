@@ -8,6 +8,16 @@ use Throwable;
 
 final class UserRepository
 {
+    private const VALID_WEEKDAYS = [
+        'monday',
+        'tuesday',
+        'wednesday',
+        'thursday',
+        'friday',
+        'saturday',
+        'sunday',
+    ];
+
     public function __construct(private readonly PDO $connection)
     {
     }
@@ -53,7 +63,8 @@ final class UserRepository
                 'roleId' => (int) $row['role_id'],
                 'avatar' => (string) ($row['avatar'] ?? ''),
                 'mustResetPassword' => (bool) $row['must_reset_password'],
-                'selectedBonusIds' => []
+                'selectedBonusIds' => [],
+                'workSchedule' => [],
             ];
         }
 
@@ -71,6 +82,34 @@ final class UserRepository
                 continue;
             }
             $users[$userId]['selectedBonusIds'][] = (int) $bonusRow['bonus_id'];
+        }
+
+        $weekdayOrder = implode(
+            "','",
+            self::VALID_WEEKDAYS
+        );
+        $scheduleStatement = $this->connection->query(
+            sprintf(
+                "SELECT user_id, day_of_week, is_working, start_time, end_time, break_minutes
+                 FROM user_work_schedules
+                 ORDER BY user_id, FIELD(day_of_week, '%s')",
+                $weekdayOrder
+            )
+        );
+
+        foreach ($scheduleStatement as $scheduleRow) {
+            $userId = (int) $scheduleRow['user_id'];
+            if (!isset($users[$userId])) {
+                continue;
+            }
+
+            $users[$userId]['workSchedule'][] = [
+                'dayOfWeek' => (string) $scheduleRow['day_of_week'],
+                'isWorking' => (bool) $scheduleRow['is_working'],
+                'startTime' => $scheduleRow['start_time'] !== null ? substr((string) $scheduleRow['start_time'], 0, 5) : null,
+                'endTime' => $scheduleRow['end_time'] !== null ? substr((string) $scheduleRow['end_time'], 0, 5) : null,
+                'breakMinutes' => (int) $scheduleRow['break_minutes'],
+            ];
         }
 
         return array_values($users);
@@ -174,6 +213,13 @@ final class UserRepository
             $insertBonusLink = $this->connection->prepare(
                 'INSERT INTO user_compensation_bonuses (user_id, bonus_id) VALUES (:user_id, :bonus_id)'
             );
+            $deleteWorkSchedules = $this->connection->prepare(
+                'DELETE FROM user_work_schedules WHERE user_id = :user_id'
+            );
+            $insertWorkSchedule = $this->connection->prepare(
+                'INSERT INTO user_work_schedules (user_id, day_of_week, is_working, start_time, end_time, break_minutes)
+                 VALUES (:user_id, :day_of_week, :is_working, :start_time, :end_time, :break_minutes)'
+            );
 
             foreach ($users as $user) {
                 $userId = (int) ($user['id'] ?? 0);
@@ -217,6 +263,43 @@ final class UserRepository
                         ':bonus_id' => $bonusId
                     ]);
                 }
+
+                $deleteWorkSchedules->execute([':user_id' => $userId]);
+
+                $workSchedules = isset($user['workSchedule']) && is_array($user['workSchedule'])
+                    ? $user['workSchedule']
+                    : [];
+
+                foreach ($workSchedules as $schedule) {
+                    if (!is_array($schedule)) {
+                        continue;
+                    }
+
+                    $day = isset($schedule['dayOfWeek'])
+                        ? strtolower((string) $schedule['dayOfWeek'])
+                        : null;
+
+                    if ($day === null || !in_array($day, self::VALID_WEEKDAYS, true)) {
+                        continue;
+                    }
+
+                    $isWorking = !empty($schedule['isWorking']);
+                    $startTime = $isWorking ? self::normalizeTime($schedule['startTime'] ?? null) : null;
+                    $endTime = $isWorking ? self::normalizeTime($schedule['endTime'] ?? null) : null;
+                    $breakMinutes = isset($schedule['breakMinutes']) ? (int) $schedule['breakMinutes'] : 0;
+                    if ($breakMinutes < 0) {
+                        $breakMinutes = 0;
+                    }
+
+                    $insertWorkSchedule->execute([
+                        ':user_id' => $userId,
+                        ':day_of_week' => $day,
+                        ':is_working' => $isWorking ? 1 : 0,
+                        ':start_time' => $startTime,
+                        ':end_time' => $endTime,
+                        ':break_minutes' => $breakMinutes
+                    ]);
+                }
             }
 
             $this->connection->commit();
@@ -226,5 +309,31 @@ final class UserRepository
         }
 
         return $this->all();
+    }
+
+    private static function normalizeTime(mixed $value): ?string
+    {
+        if (!is_string($value)) {
+            return null;
+        }
+
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return null;
+        }
+
+        if (!preg_match('/^\d{1,2}:\d{2}$/', $trimmed)) {
+            return null;
+        }
+
+        [$hoursRaw, $minutesRaw] = explode(':', $trimmed, 2);
+        $hours = (int) $hoursRaw;
+        $minutes = (int) $minutesRaw;
+
+        if ($hours < 0 || $hours > 23 || $minutes < 0 || $minutes > 59) {
+            return null;
+        }
+
+        return sprintf('%02d:%02d:00', $hours, $minutes);
     }
 }

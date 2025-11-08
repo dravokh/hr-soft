@@ -27,6 +27,23 @@ export interface CompensationBonusInput {
   children: CompensationBonusInput[];
 }
 
+export type Weekday =
+  | 'monday'
+  | 'tuesday'
+  | 'wednesday'
+  | 'thursday'
+  | 'friday'
+  | 'saturday'
+  | 'sunday';
+
+export interface WorkScheduleDay {
+  dayOfWeek: Weekday;
+  isWorking: boolean;
+  startTime: string | null;
+  endTime: string | null;
+  breakMinutes: number;
+}
+
 export interface User {
   id: number;
   name: string;
@@ -44,6 +61,7 @@ export interface User {
   lateHoursAllowed?: number;
   penaltyPercent?: number;
   selectedBonusIds?: number[];
+  workSchedule?: WorkScheduleDay[];
 }
 
 export type ApplicationStatus = 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CLOSED';

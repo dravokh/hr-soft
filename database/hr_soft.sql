@@ -156,6 +156,19 @@ CREATE TABLE `user_compensation_bonuses` (
     ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `user_work_schedules` (
+  `user_id` INT NOT NULL,
+  `day_of_week` ENUM('monday','tuesday','wednesday','thursday','friday','saturday','sunday') NOT NULL,
+  `is_working` TINYINT(1) NOT NULL DEFAULT 0,
+  `start_time` TIME DEFAULT NULL,
+  `end_time` TIME DEFAULT NULL,
+  `break_minutes` INT NOT NULL DEFAULT 0,
+  PRIMARY KEY (`user_id`, `day_of_week`),
+  CONSTRAINT `uws_user_fk`
+    FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 INSERT INTO `users` (
   `id`,
   `name`,
@@ -196,6 +209,36 @@ INSERT INTO `user_compensation_bonuses` (`user_id`, `bonus_id`) VALUES
   (2, 3),
   (2, 6),
   (3, 2);
+
+INSERT INTO `user_work_schedules` (
+  `user_id`,
+  `day_of_week`,
+  `is_working`,
+  `start_time`,
+  `end_time`,
+  `break_minutes`
+) VALUES
+  (1, 'monday', 1, '09:00:00', '18:00:00', 60),
+  (1, 'tuesday', 1, '09:00:00', '18:00:00', 60),
+  (1, 'wednesday', 1, '09:00:00', '18:00:00', 60),
+  (1, 'thursday', 1, '09:00:00', '18:00:00', 60),
+  (1, 'friday', 1, '09:00:00', '18:00:00', 60),
+  (1, 'saturday', 0, NULL, NULL, 0),
+  (1, 'sunday', 0, NULL, NULL, 0),
+  (2, 'monday', 1, '09:00:00', '18:00:00', 60),
+  (2, 'tuesday', 1, '09:00:00', '18:00:00', 60),
+  (2, 'wednesday', 1, '09:00:00', '18:00:00', 60),
+  (2, 'thursday', 1, '09:00:00', '18:00:00', 60),
+  (2, 'friday', 1, '09:00:00', '18:00:00', 60),
+  (2, 'saturday', 0, NULL, NULL, 0),
+  (2, 'sunday', 0, NULL, NULL, 0),
+  (3, 'monday', 1, '10:00:00', '19:00:00', 45),
+  (3, 'tuesday', 1, '10:00:00', '19:00:00', 45),
+  (3, 'wednesday', 1, '10:00:00', '19:00:00', 45),
+  (3, 'thursday', 1, '10:00:00', '19:00:00', 45),
+  (3, 'friday', 1, '10:00:00', '19:00:00', 45),
+  (3, 'saturday', 0, NULL, NULL, 0),
+  (3, 'sunday', 0, NULL, NULL, 0);
 
 -- Application catalog and records
 CREATE TABLE `application_types` (

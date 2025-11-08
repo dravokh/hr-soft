@@ -42,6 +42,7 @@ import {
   syncUsers,
   syncCompensationBonuses
 } from '../services/api';
+import { sanitizeWorkSchedule } from '../utils/workSchedule';
 
 const normalizeBonusTree = (nodes: CompensationBonus[]): CompensationBonus[] =>
   nodes.map((node) => ({
@@ -127,6 +128,7 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
           )
         )
       : [];
+    const workSchedule = sanitizeWorkSchedule(user.workSchedule);
 
     if (explicitFirst || explicitLast) {
       return {
@@ -141,7 +143,8 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
         vacationDays,
         lateHoursAllowed,
         penaltyPercent,
-        selectedBonusIds
+        selectedBonusIds,
+        workSchedule
       };
     }
 
@@ -157,7 +160,8 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
         vacationDays,
         lateHoursAllowed,
         penaltyPercent,
-        selectedBonusIds
+        selectedBonusIds,
+        workSchedule
       };
     }
 
@@ -176,7 +180,8 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
       vacationDays,
       lateHoursAllowed,
       penaltyPercent,
-      selectedBonusIds
+      selectedBonusIds,
+      workSchedule
     };
   }, []);
 
@@ -203,6 +208,7 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
               )
             )
           : [];
+        const workSchedule = sanitizeWorkSchedule(user.workSchedule);
 
         return {
           ...user,
@@ -215,7 +221,8 @@ export const AppProvider: React.FC<React.PropsWithChildren> = ({ children }) => 
           vacationDays,
           lateHoursAllowed,
           penaltyPercent,
-          selectedBonusIds
+          selectedBonusIds,
+          workSchedule
         };
       }),
     []

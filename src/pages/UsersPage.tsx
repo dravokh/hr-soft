@@ -1,8 +1,9 @@
 ﻿
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
-import { Plus, Pencil, Trash2, X } from 'lucide-react';
+import { Clock, Plus, Pencil, Trash2, X } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
-import type { CompensationBonus, CompensationBonusInput, User } from '../types';
+import type { CompensationBonus, CompensationBonusInput, User, WorkScheduleDay, Weekday } from '../types';
+import { createDefaultWorkSchedule, sanitizeWorkSchedule } from '../utils/workSchedule';
 
 interface UsersPageProps {
   language: 'ka' | 'en';
@@ -20,6 +21,7 @@ type FormState = {
   lateHoursAllowed: string;
   penaltyPercent: string;
   selectedBonusIds: number[];
+  workSchedule: WorkScheduleDay[];
 };
 
 type CopyEntry = {
@@ -99,6 +101,32 @@ type CopyEntry = {
   bonusSave: string;
   bonusClose: string;
   bonusSelectedCount: string;
+    workScheduleTitle: "სამუშაო გრაფიკი",
+    workScheduleDescription: "დააყენეთ თანამშრომლის სამუშაო დღეები, საათები და შესვენებები.",
+    workScheduleButton: "სამუშაო ცვლა",
+    workScheduleModalTitle: "სამუშაო გრაფიკის კონფიგურაცია",
+    workScheduleWorkingDay: "სამუშაო დღე",
+    workScheduleDayOff: "დასვენების დღე",
+    workScheduleStartLabel: "დაწყების დრო",
+    workScheduleEndLabel: "დასრულების დრო",
+    workScheduleBreakLabel: "შესვენება (წუთი)",
+    workScheduleModalSave: "გრაფიკის შენახვა",
+    workScheduleModalCancel: "დახურვა",
+    workScheduleSummaryLabel: "კვირის დატვირთვა",
+    workScheduleSelectedDays: "სამუშაო დღეების რაოდენობა"
+  workScheduleTitle: string;
+  workScheduleDescription: string;
+  workScheduleButton: string;
+  workScheduleModalTitle: string;
+  workScheduleWorkingDay: string;
+  workScheduleDayOff: string;
+  workScheduleStartLabel: string;
+  workScheduleEndLabel: string;
+  workScheduleBreakLabel: string;
+  workScheduleModalSave: string;
+  workScheduleModalCancel: string;
+  workScheduleSummaryLabel: string;
+  workScheduleSelectedDays: string;
 };
 
 const COPY: Record<UsersPageProps["language"], CopyEntry> = {
@@ -256,8 +284,87 @@ const COPY: Record<UsersPageProps["language"], CopyEntry> = {
     bonusCancel: "Cancel",
     bonusSave: "Save catalogue",
     bonusClose: "Close",
-    bonusSelectedCount: "selected"
+    bonusSelectedCount: "selected",
+    workScheduleTitle: "Work schedule",
+    workScheduleDescription: "Configure this user's working days, hours, and breaks.",
+    workScheduleButton: "Work shift",
+    workScheduleModalTitle: "Work shift configuration",
+    workScheduleWorkingDay: "Working day",
+    workScheduleDayOff: "Day off",
+    workScheduleStartLabel: "Start time",
+    workScheduleEndLabel: "End time",
+    workScheduleBreakLabel: "Break (minutes)",
+    workScheduleModalSave: "Save schedule",
+    workScheduleModalCancel: "Close",
+    workScheduleSummaryLabel: "Weekly workload",
+    workScheduleSelectedDays: "Working days"
   }
+};
+
+const WEEKDAY_LABELS: Record<UsersPageProps['language'], Record<Weekday, string>> = {
+  ka: {
+    monday: 'ორშაბათი',
+    tuesday: 'სამშაბათი',
+    wednesday: 'ოთხშაბათი',
+    thursday: 'ხუთშაბათი',
+    friday: 'პარასკევი',
+    saturday: 'შაბათი',
+    sunday: 'კვირა'
+  },
+  en: {
+    monday: 'Monday',
+    tuesday: 'Tuesday',
+    wednesday: 'Wednesday',
+    thursday: 'Thursday',
+    friday: 'Friday',
+    saturday: 'Saturday',
+    sunday: 'Sunday'
+  }
+};
+
+const parseTimeToMinutes = (value: string | null): number | null => {
+  if (!value) {
+    return null;
+  }
+  const [hoursRaw, minutesRaw] = value.split(':');
+  if (hoursRaw === undefined || minutesRaw === undefined) {
+    return null;
+  }
+  const hours = Number(hoursRaw);
+  const minutes = Number(minutesRaw);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return null;
+  }
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return null;
+  }
+  return hours * 60 + minutes;
+};
+
+const calculateDailyMinutes = (entry: WorkScheduleDay): number => {
+  if (!entry.isWorking) {
+    return 0;
+  }
+
+  const start = parseTimeToMinutes(entry.startTime ?? null);
+  const end = parseTimeToMinutes(entry.endTime ?? null);
+
+  if (start === null || end === null || end <= start) {
+    return 0;
+  }
+
+  const breakMinutes = Number.isFinite(entry.breakMinutes) ? Math.max(0, entry.breakMinutes) : 0;
+  return Math.max(0, end - start - breakMinutes);
+};
+
+const formatDuration = (minutes: number, language: UsersPageProps['language']): string => {
+  const safeMinutes = Math.max(0, minutes);
+  const hours = Math.floor(safeMinutes / 60);
+  const leftover = safeMinutes % 60;
+
+  return language === 'ka'
+    ? `${hours}სთ ${leftover}წთ`
+    : `${hours}h ${leftover}m`;
 };
 
 
@@ -376,7 +483,8 @@ export const UsersPage: React.FC<UsersPageProps> = ({ language }) => {
     vacationDays: '24',
     lateHoursAllowed: '4',
     penaltyPercent: '0',
-    selectedBonusIds: []
+    selectedBonusIds: [],
+    workSchedule: createDefaultWorkSchedule()
   }));
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -394,6 +502,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ language }) => {
   const [bonusFormValues, setBonusFormValues] = useState({ name: '', percent: '' });
   const [bonusFormError, setBonusFormError] = useState<string | null>(null);
   const [bonusSaving, setBonusSaving] = useState(false);
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
 
   useEffect(() => {
     if (!editingUserId && !formData.roleId && defaultRoleId) {
@@ -417,6 +526,36 @@ export const UsersPage: React.FC<UsersPageProps> = ({ language }) => {
       return { ...previous, selectedBonusIds: filtered };
     });
   }, [compensationBonuses]);
+
+  const updateWorkSchedule = (day: Weekday, changes: Partial<WorkScheduleDay>) => {
+    setFormData((previous) => ({
+      ...previous,
+      workSchedule: previous.workSchedule.map((entry) =>
+        entry.dayOfWeek === day ? { ...entry, ...changes } : entry
+      )
+    }));
+  };
+
+  const handleToggleWorkDay = (day: Weekday, isWorking: boolean) => {
+    updateWorkSchedule(day, { isWorking });
+  };
+
+  const handleScheduleTimeChange = (day: Weekday, field: 'startTime' | 'endTime', value: string) => {
+    updateWorkSchedule(day, { [field]: value } as Partial<WorkScheduleDay>);
+  };
+
+  const handleScheduleBreakChange = (day: Weekday, value: number) => {
+    const safeValue = Number.isFinite(value) ? value : 0;
+    updateWorkSchedule(day, { breakMinutes: Math.max(0, Math.round(safeValue)) });
+  };
+
+  const handleScheduleModalSave = () => {
+    setFormData((previous) => ({
+      ...previous,
+      workSchedule: sanitizeWorkSchedule(previous.workSchedule)
+    }));
+    setScheduleModalOpen(false);
+  };
 
   const canView = hasPermission('view_users');
   const canCreate = hasPermission('create_users');
@@ -455,6 +594,16 @@ export const UsersPage: React.FC<UsersPageProps> = ({ language }) => {
     }
     return base + (base * totalBonusPercent) / 100;
   }, [formData.salary, totalBonusPercent]);
+
+  const weeklyMinutes = useMemo(
+    () => formData.workSchedule.reduce((total, day) => total + calculateDailyMinutes(day), 0),
+    [formData.workSchedule]
+  );
+
+  const workingDayCount = useMemo(
+    () => formData.workSchedule.filter((day) => day.isWorking).length,
+    [formData.workSchedule]
+  );
 
   const filteredUsers = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -501,7 +650,8 @@ export const UsersPage: React.FC<UsersPageProps> = ({ language }) => {
       vacationDays: '24',
       lateHoursAllowed: '4',
       penaltyPercent: '0',
-      selectedBonusIds: []
+      selectedBonusIds: [],
+      workSchedule: createDefaultWorkSchedule()
     });
   };
 
@@ -543,7 +693,8 @@ export const UsersPage: React.FC<UsersPageProps> = ({ language }) => {
           : '4',
       penaltyPercent:
         existing.penaltyPercent !== undefined ? String(existing.penaltyPercent) : '0',
-      selectedBonusIds: (existing.selectedBonusIds ?? []).filter((id) => bonusLookup.has(id))
+      selectedBonusIds: (existing.selectedBonusIds ?? []).filter((id) => bonusLookup.has(id)),
+      workSchedule: sanitizeWorkSchedule(existing.workSchedule)
     });
     setError(null);
     setSuccess(null);
@@ -632,6 +783,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ language }) => {
 
     const fullName = [trimmedFirstName, trimmedLastName].filter(Boolean).join(' ');
     const avatar = (trimmedFirstName.charAt(0) || trimmedLastName.charAt(0) || 'U').toUpperCase();
+    const normalizedSchedule = sanitizeWorkSchedule(formData.workSchedule);
 
     setIsSubmitting(true);
 
@@ -653,7 +805,8 @@ export const UsersPage: React.FC<UsersPageProps> = ({ language }) => {
                 vacationDays,
                 lateHoursAllowed,
                 penaltyPercent,
-                selectedBonusIds: [...formData.selectedBonusIds]
+                selectedBonusIds: [...formData.selectedBonusIds],
+                workSchedule: normalizedSchedule
               }
             : user
         );
@@ -681,7 +834,8 @@ export const UsersPage: React.FC<UsersPageProps> = ({ language }) => {
             vacationDays,
             lateHoursAllowed,
             penaltyPercent,
-            selectedBonusIds: [...formData.selectedBonusIds]
+            selectedBonusIds: [...formData.selectedBonusIds],
+            workSchedule: normalizedSchedule
           }
         ]);
         setSuccess(t.success);
@@ -972,6 +1126,39 @@ export const UsersPage: React.FC<UsersPageProps> = ({ language }) => {
             />
           </div>
 
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-slate-600">{t.workScheduleTitle}</label>
+            <p className="text-xs text-slate-500">{t.workScheduleDescription}</p>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+              <div className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                <div className="flex flex-wrap gap-4">
+                  <span>
+                    <span className="font-semibold text-slate-900">
+                      {t.workScheduleSelectedDays}:
+                    </span>{' '}
+                    {workingDayCount}/7
+                  </span>
+                  <span>
+                    <span className="font-semibold text-slate-900">
+                      {t.workScheduleSummaryLabel}:
+                    </span>{' '}
+                    <span className="font-semibold text-emerald-600">
+                      {formatDuration(weeklyMinutes, language)}
+                    </span>
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setScheduleModalOpen(true)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                <Clock size={16} className="text-blue-600" />
+                <span>{t.workScheduleButton}</span>
+              </button>
+            </div>
+          </div>
+
           <div className="md:col-span-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
             {t.compensationNote}
             {formData.salary && (
@@ -1130,7 +1317,135 @@ export const UsersPage: React.FC<UsersPageProps> = ({ language }) => {
             </table>
           </div>
         )}
-      </div>      {bonusModalOpen ? (
+      </div>
+
+      {scheduleModalOpen ? (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/70 p-4"
+          onClick={() => setScheduleModalOpen(false)}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div className="flex items-center gap-3">
+                <Clock className="text-blue-600" size={20} />
+                <h3 className="text-lg font-semibold text-slate-900">{t.workScheduleModalTitle}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setScheduleModalOpen(false)}
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                aria-label="Close schedule modal"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto px-6 py-4 space-y-4">
+              {formData.workSchedule.map((entry) => (
+                <div key={entry.dayOfWeek} className="rounded-2xl border border-slate-200 p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">
+                        {WEEKDAY_LABELS[language][entry.dayOfWeek]}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {entry.isWorking ? t.workScheduleWorkingDay : t.workScheduleDayOff}
+                      </p>
+                    </div>
+                    <div className="text-sm font-semibold text-emerald-600">
+                      {formatDuration(calculateDailyMinutes(entry), language)}
+                    </div>
+                    <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-600">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        checked={entry.isWorking}
+                        onChange={(event) =>
+                          handleToggleWorkDay(entry.dayOfWeek, event.target.checked)
+                        }
+                      />
+                      {entry.isWorking ? t.workScheduleWorkingDay : t.workScheduleDayOff}
+                    </label>
+                  </div>
+                  {entry.isWorking ? (
+                    <div className="mt-4 grid gap-4 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          {t.workScheduleStartLabel}
+                        </label>
+                        <input
+                          type="time"
+                          value={entry.startTime ?? '09:00'}
+                          onChange={(event) =>
+                            handleScheduleTimeChange(entry.dayOfWeek, 'startTime', event.target.value)
+                          }
+                          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          {t.workScheduleEndLabel}
+                        </label>
+                        <input
+                          type="time"
+                          value={entry.endTime ?? '18:00'}
+                          onChange={(event) =>
+                            handleScheduleTimeChange(entry.dayOfWeek, 'endTime', event.target.value)
+                          }
+                          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          {t.workScheduleBreakLabel}
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={5}
+                          value={entry.breakMinutes}
+                          onChange={(event) =>
+                            handleScheduleBreakChange(entry.dayOfWeek, Number(event.target.value))
+                          }
+                          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-col gap-3 border-t border-slate-200 px-6 py-4 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                {t.workScheduleSummaryLabel}:{' '}
+                <strong className="text-slate-900">
+                  {formatDuration(weeklyMinutes, language)}
+                </strong>
+              </span>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setScheduleModalOpen(false)}
+                  className="rounded-lg border border-slate-200 px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  {t.workScheduleModalCancel}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleScheduleModalSave}
+                  className="rounded-lg bg-blue-600 px-5 py-2 font-semibold text-white shadow-sm hover:bg-blue-700"
+                >
+                  {t.workScheduleModalSave}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {bonusModalOpen ? (
         <div
           className="fixed inset-0 z-30 flex items-center justify-center bg-slate-900/60 p-4"
           onClick={() => setBonusModalOpen(false)}
