@@ -33,11 +33,15 @@ final class UserRepository
                 email,
                 phone,
                 personal_id,
+                subject,
                 password,
                 base_salary,
                 vacation_days,
                 late_hours_allowed,
                 penalty_percent,
+                vacation_days_used,
+                grace_minutes_used,
+                penalty_minutes_used,
                 role_id,
                 avatar,
                 must_reset_password
@@ -55,11 +59,15 @@ final class UserRepository
                 'email' => (string) $row['email'],
                 'phone' => (string) ($row['phone'] ?? ''),
                 'personalId' => (string) ($row['personal_id'] ?? ''),
+                'subject' => $row['subject'] !== null ? (string) $row['subject'] : null,
                 'password' => (string) $row['password'],
                 'baseSalary' => (float) $row['base_salary'],
                 'vacationDays' => (int) $row['vacation_days'],
                 'lateHoursAllowed' => (int) $row['late_hours_allowed'],
                 'penaltyPercent' => (float) $row['penalty_percent'],
+                'vacationDaysUsed' => (int) $row['vacation_days_used'],
+                'graceMinutesUsed' => (int) $row['grace_minutes_used'],
+                'penaltyMinutesUsed' => (int) $row['penalty_minutes_used'],
                 'roleId' => (int) $row['role_id'],
                 'avatar' => (string) ($row['avatar'] ?? ''),
                 'mustResetPassword' => (bool) $row['must_reset_password'],
@@ -164,11 +172,15 @@ final class UserRepository
                     email,
                     phone,
                     personal_id,
+                    subject,
                     password,
                     base_salary,
                     vacation_days,
                     late_hours_allowed,
                     penalty_percent,
+                    vacation_days_used,
+                    grace_minutes_used,
+                    penalty_minutes_used,
                     role_id,
                     avatar,
                     must_reset_password
@@ -181,11 +193,15 @@ final class UserRepository
                     :email,
                     :phone,
                     :personal_id,
+                    :subject,
                     :password,
                     :base_salary,
                     :vacation_days,
                     :late_hours_allowed,
                     :penalty_percent,
+                    :vacation_days_used,
+                    :grace_minutes_used,
+                    :penalty_minutes_used,
                     :role_id,
                     :avatar,
                     :must_reset_password
@@ -197,11 +213,15 @@ final class UserRepository
                     email = VALUES(email),
                     phone = VALUES(phone),
                     personal_id = VALUES(personal_id),
+                    subject = VALUES(subject),
                     password = VALUES(password),
                     base_salary = VALUES(base_salary),
                     vacation_days = VALUES(vacation_days),
                     late_hours_allowed = VALUES(late_hours_allowed),
                     penalty_percent = VALUES(penalty_percent),
+                    vacation_days_used = VALUES(vacation_days_used),
+                    grace_minutes_used = VALUES(grace_minutes_used),
+                    penalty_minutes_used = VALUES(penalty_minutes_used),
                     role_id = VALUES(role_id),
                     avatar = VALUES(avatar),
                     must_reset_password = VALUES(must_reset_password)'
@@ -237,11 +257,17 @@ final class UserRepository
                         ? (string) $user['phone']
                         : null,
                     ':personal_id' => (string) ($user['personalId'] ?? ''),
+                    ':subject' => $user['subject'] !== null && $user['subject'] !== ''
+                        ? (string) $user['subject']
+                        : null,
                     ':password' => (string) ($user['password'] ?? ''),
                     ':base_salary' => isset($user['baseSalary']) ? (float) $user['baseSalary'] : 0,
                     ':vacation_days' => isset($user['vacationDays']) ? (int) $user['vacationDays'] : 0,
                     ':late_hours_allowed' => isset($user['lateHoursAllowed']) ? (int) $user['lateHoursAllowed'] : 0,
                     ':penalty_percent' => isset($user['penaltyPercent']) ? (float) $user['penaltyPercent'] : 0,
+                    ':vacation_days_used' => isset($user['vacationDaysUsed']) ? (int) $user['vacationDaysUsed'] : 0,
+                    ':grace_minutes_used' => isset($user['graceMinutesUsed']) ? (int) $user['graceMinutesUsed'] : 0,
+                    ':penalty_minutes_used' => isset($user['penaltyMinutesUsed']) ? (int) $user['penaltyMinutesUsed'] : 0,
                     ':role_id' => (int) ($user['roleId'] ?? 0),
                     ':avatar' => $user['avatar'] !== null && $user['avatar'] !== ''
                         ? (string) $user['avatar']
@@ -309,6 +335,31 @@ final class UserRepository
         }
 
         return $this->all();
+    }
+
+    public function updatePassword(int $userId, string $newPassword, bool $mustResetPassword): bool
+    {
+        $statement = $this->connection->prepare(
+            'UPDATE users SET password = :password, must_reset_password = :must_reset WHERE id = :id LIMIT 1'
+        );
+
+        return $statement->execute([
+            ':password' => $newPassword,
+            ':must_reset' => $mustResetPassword ? 1 : 0,
+            ':id' => $userId,
+        ]);
+    }
+
+    public function setMustResetPassword(int $userId, bool $mustResetPassword): bool
+    {
+        $statement = $this->connection->prepare(
+            'UPDATE users SET must_reset_password = :must_reset WHERE id = :id LIMIT 1'
+        );
+
+        return $statement->execute([
+            ':must_reset' => $mustResetPassword ? 1 : 0,
+            ':id' => $userId,
+        ]);
     }
 
     private static function normalizeTime(mixed $value): ?string

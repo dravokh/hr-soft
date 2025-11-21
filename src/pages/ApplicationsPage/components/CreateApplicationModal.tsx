@@ -1,9 +1,11 @@
-import React, { FormEvent } from 'react';
+import React, { FormEvent, useEffect, useMemo, useState } from 'react';
 import { X, Paperclip, PlusCircle, Send } from 'lucide-react';
-import { ApplicationType, ApplicationFieldDefinition } from '../../../types';
+import { ApplicationType, ApplicationFieldDefinition, User, Weekday } from '../../../types';
 import { AttachmentDraft } from '../types';
 import { COPY } from '../constants';
 import { formatFileSize, splitRange } from '../utils';
+import { allocateUsage, formatMinutes } from '../../../utils/usage';
+import { calculateExtraBonus, validateExtraBonusInput } from '../../../utils/extraBonus';
 
 interface CreateApplicationModalProps {
   isOpen: boolean;
@@ -27,7 +29,43 @@ interface CreateApplicationModalProps {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   fileInputRef: React.RefObject<HTMLInputElement>;
   onFileUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  requester: User | null;
 }
+
+type TimeDraft = { hour: string; minute: string };
+const HOURS = Array.from({ length: 24 }, (_, index) => index.toString().padStart(2, '0'));
+const MINUTES = Array.from({ length: 60 }, (_, index) => index.toString().padStart(2, '0'));
+const WEEKDAY_SEQUENCE: Weekday[] = [
+  'sunday',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday'
+];
+
+const formatCurrency = (value: number, language: 'ka' | 'en'): string => {
+  const formatter = new Intl.NumberFormat(language === 'ka' ? 'ka-GE' : 'en-US', {
+    style: 'currency',
+    currency: 'GEL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+  return formatter.format(Number.isFinite(value) ? value : 0);
+};
+
+const weekdayFromDateInput = (value: string): Weekday | null => {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  const index = date.getUTCDay();
+  return WEEKDAY_SEQUENCE[index] ?? null;
+};
 
 export const CreateApplicationModal: React.FC<CreateApplicationModalProps> = ({
   isOpen,
@@ -51,8 +89,134 @@ export const CreateApplicationModal: React.FC<CreateApplicationModalProps> = ({
   onSubmit,
   fileInputRef,
   onFileUpload,
+  requester
 }) => {
   const t = COPY[language];
+  const [timeDrafts, setTimeDrafts] = useState<Record<string, TimeDraft>>({});
+  const [scheduleValidation, setScheduleValidation] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setTimeDrafts({});
+      setScheduleValidation(null);
+    }
+  }, [isOpen]);
+  const usageAllocation = useMemo(() => {
+    if (!selectedType || !requester) {
+      return null;
+    }
+    return allocateUsage(selectedType, requester, values);
+  }, [selectedType, requester, values]);
+  const usageEnabled =
+    usageAllocation &&
+    (usageAllocation.vacation.enabled ||
+      usageAllocation.grace.enabled ||
+      usageAllocation.penalty.enabled);
+  const extraBonusPreview = useMemo(() => {
+    if (!selectedType || !requester || !selectedType.capabilities?.usesExtraBonusTracker) {
+      return null;
+    }
+    return calculateExtraBonus(selectedType, requester, values);
+  }, [selectedType, requester, values]);
+  const requiresWorkingDayValidation = useMemo(
+    () =>
+      Boolean(
+        selectedType &&
+          (selectedType.capabilities?.usesGracePeriodTracker ||
+            selectedType.capabilities?.usesPenaltyTracker)
+      ),
+    [selectedType]
+  );
+  useEffect(() => {
+    if (!requiresWorkingDayValidation) {
+      setScheduleValidation(null);
+    }
+  }, [requiresWorkingDayValidation]);
+  const shouldValidateWorkingDayKey = (key: string): boolean => {
+    if (!requiresWorkingDayValidation) {
+      return false;
+    }
+    const normalized = key.toLowerCase();
+    if (normalized.includes('end')) {
+      return false;
+    }
+    if (normalized.includes('start')) {
+      return true;
+    }
+    if (normalized.includes('work')) {
+      return true;
+    }
+    return normalized === 'date';
+  };
+
+  const enforceWorkingDaySelection = (value: string): boolean => {
+    if (!requiresWorkingDayValidation || !value) {
+      if (scheduleValidation) {
+        setScheduleValidation(null);
+      }
+      return true;
+    }
+    if (!requester?.workSchedule || requester.workSchedule.length === 0) {
+      if (scheduleValidation) {
+        setScheduleValidation(null);
+      }
+      return true;
+    }
+    const weekday = weekdayFromDateInput(value);
+    if (!weekday) {
+      if (scheduleValidation) {
+        setScheduleValidation(null);
+      }
+      return true;
+    }
+    const entry = requester.workSchedule.find((day) => day.dayOfWeek === weekday);
+    if (!entry) {
+      if (scheduleValidation) {
+        setScheduleValidation(null);
+      }
+      return true;
+    }
+    if (!entry.isWorking) {
+      setScheduleValidation(t.createModal.nonWorkingDayError);
+      return false;
+    }
+    if (scheduleValidation) {
+      setScheduleValidation(null);
+    }
+    return true;
+  };
+
+  const parseTimeDraft = (rawValue: string | undefined): TimeDraft => {
+    if (!rawValue) {
+      return { hour: '', minute: '' };
+    }
+    const [rawHour = '', rawMinute = ''] = rawValue.split(':');
+    return {
+      hour: rawHour.padStart(2, '0').slice(-2),
+      minute: rawMinute.padStart(2, '0').slice(-2)
+    };
+  };
+
+  const handleTimeDraftChange = (
+    key: string,
+    part: keyof TimeDraft,
+    nextValue: string,
+    fieldValues: Record<string, string>,
+    setFieldValues: (values: Record<string, string>) => void
+  ) => {
+    const currentDraft = timeDrafts[key] ?? parseTimeDraft(fieldValues[key]);
+    const nextDraft = { ...currentDraft, [part]: nextValue };
+    setTimeDrafts((previous) => ({ ...previous, [key]: nextDraft }));
+
+    if (nextDraft.hour && nextDraft.minute) {
+      setFieldValues({
+        ...fieldValues,
+        [key]: `${nextDraft.hour}:${nextDraft.minute}`
+      });
+    } else {
+      setFieldValues({ ...fieldValues, [key]: '' });
+    }
+  };
 
   const renderFieldInput = (
     field: ApplicationFieldDefinition,
@@ -60,6 +224,7 @@ export const CreateApplicationModal: React.FC<CreateApplicationModalProps> = ({
     setFieldValues: (updater: Record<string, string>) => void
   ) => {
     const value = fieldValues[field.key] ?? '';
+    const validateWorkingDay = shouldValidateWorkingDayKey(field.key);
 
     const updateValue = (next: string) => {
       setFieldValues({ ...fieldValues, [field.key]: next });
@@ -86,7 +251,13 @@ export const CreateApplicationModal: React.FC<CreateApplicationModalProps> = ({
             type="date"
             required={field.required}
             value={range.start}
-            onChange={(event) => updateValue(`${event.target.value}/${range.end}`)}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+              if (validateWorkingDay && !enforceWorkingDaySelection(nextValue)) {
+                return;
+              }
+              updateValue(`${nextValue}/${range.end}`);
+            }}
             className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
           />
           <input
@@ -133,12 +304,56 @@ export const CreateApplicationModal: React.FC<CreateApplicationModalProps> = ({
       );
     }
 
+    if (field.type === 'time') {
+      const draft = timeDrafts[field.key] ?? parseTimeDraft(value);
+      return (
+        <div className="flex items-center gap-2">
+          <select
+            value={draft.hour}
+            onChange={(event) =>
+              handleTimeDraftChange(field.key, 'hour', event.target.value, fieldValues, setFieldValues)
+            }
+            className="w-24 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+          >
+            <option value="">{language === 'ka' ? 'საათი' : 'HH'}</option>
+            {HOURS.map((hour) => (
+              <option key={hour} value={hour}>
+                {hour}
+              </option>
+            ))}
+          </select>
+          <span className="text-slate-400">:</span>
+          <select
+            value={draft.minute}
+            onChange={(event) =>
+              handleTimeDraftChange(field.key, 'minute', event.target.value, fieldValues, setFieldValues)
+            }
+            className="w-24 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+          >
+            <option value="">{language === 'ka' ? 'წუთი' : 'MM'}</option>
+            {MINUTES.map((minute) => (
+              <option key={minute} value={minute}>
+                {minute}
+              </option>
+            ))}
+          </select>
+        </div>
+      );
+    }
+
+    const inputType = field.type === 'date' ? 'date' : 'text';
     return (
       <input
-        type={field.type === 'date' ? 'date' : field.type === 'time' ? 'time' : 'text'}
+        type={inputType}
         required={field.required}
         value={value}
-        onChange={(event) => updateValue(event.target.value)}
+        onChange={(event) => {
+          const nextValue = event.target.value;
+          if (inputType === 'date' && validateWorkingDay && !enforceWorkingDaySelection(nextValue)) {
+            return;
+          }
+          updateValue(nextValue);
+        }}
         className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
         placeholder={field.placeholder ? field.placeholder[language] : ''}
       />
@@ -149,6 +364,8 @@ export const CreateApplicationModal: React.FC<CreateApplicationModalProps> = ({
     onTypeIdChange(typeId);
     onValuesChange({});
     onAttachmentsChange([]);
+    setTimeDrafts({});
+    setScheduleValidation(null);
     onErrorChange(null);
     onSuccessChange(null);
     if (fileInputRef.current) {
@@ -204,6 +421,147 @@ export const CreateApplicationModal: React.FC<CreateApplicationModalProps> = ({
                 ))}
               </select>
             </div>
+
+            {selectedType && requester && usageEnabled && usageAllocation && (
+              <div className="rounded-2xl border border-slate-200 bg-white/70 p-5 shadow-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      {t.createModal.usageTitle}
+                    </p>
+                    <p className="text-sm text-slate-600">{requester.name}</p>
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    {t.createModal.usageAfterNote}
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  {usageAllocation.vacation.enabled && (
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        {t.createModal.usageVacation}
+                      </p>
+                      <p className="text-lg font-semibold text-slate-900">
+                        {usageAllocation.vacation.remainingBefore}d {t.createModal.usageRemaining}
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {t.createModal.usageAvailable}: {usageAllocation.vacation.total}d · {t.createModal.usageUsed}:{' '}
+                        {usageAllocation.vacation.usedBefore}d
+                      </p>
+                      {usageAllocation.vacation.apply > 0 && (
+                        <p className="text-sm text-slate-600">
+                          {t.createModal.usageAfter}:{' '}
+                          {Math.max(0, usageAllocation.vacation.remainingAfter)}d
+                        </p>
+                      )}
+                      {usageAllocation.vacation.overflow > 0 && (
+                        <p className="text-xs font-semibold text-rose-600">
+                          {t.createModal.usageExceeded.replace(
+                            '{value}',
+                            `${usageAllocation.vacation.overflow}d`
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {usageAllocation.grace.enabled && (
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        {t.createModal.usageGrace}
+                      </p>
+                      <p className="text-lg font-semibold text-slate-900">
+                        {formatMinutes(usageAllocation.grace.remainingBefore)} {t.createModal.usageRemaining}
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {t.createModal.usageAvailable}: {formatMinutes(usageAllocation.grace.totalMinutes)} ·{' '}
+                        {t.createModal.usageUsed}: {formatMinutes(usageAllocation.grace.usedBefore)}
+                      </p>
+                      {usageAllocation.grace.apply > 0 && (
+                        <p className="text-sm text-slate-600">
+                          {t.createModal.usageAfter}:{' '}
+                          {formatMinutes(Math.max(0, usageAllocation.grace.remainingAfter))}
+                        </p>
+                      )}
+                      {usageAllocation.grace.overflow > 0 && (
+                        <p className="text-xs font-semibold text-rose-600">
+                          {t.createModal.usageExceeded.replace(
+                            '{value}',
+                            formatMinutes(usageAllocation.grace.overflow)
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {usageAllocation.penalty.enabled && (
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        {t.createModal.usagePenalty}
+                      </p>
+                      <p className="text-lg font-semibold text-slate-900">
+                        {formatMinutes(usageAllocation.penalty.usedBefore)} {t.createModal.usageUsed}
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {t.createModal.usageAfter}:{' '}
+                        {formatMinutes(usageAllocation.penalty.usedAfter)}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {t.createModal.usagePenaltyRate.replace(
+                          '{value}',
+                          `${usageAllocation.penalty.ratePercent}%`
+                        )}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {selectedType?.capabilities?.usesExtraBonusTracker && requester && (
+              <div className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm">
+                <div className="flex flex-col gap-1">
+                  <p className="text-sm font-semibold text-emerald-700">{t.createModal.extraTitle}</p>
+                  <p className="text-xs text-slate-500">{t.createModal.extraDescription}</p>
+                </div>
+                {extraBonusPreview ? (
+                  <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-400">
+                        {t.createModal.extraHours}
+                      </p>
+                      <p className="text-lg font-semibold text-slate-900">
+                        {formatMinutes(extraBonusPreview.minutes)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-400">
+                        {t.createModal.extraPayout}
+                      </p>
+                      <p className="text-lg font-semibold text-emerald-600">
+                        {formatCurrency(extraBonusPreview.totalAmount, language)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-400">
+                        {t.createModal.extraRate}
+                      </p>
+                      <p className="text-lg font-semibold text-slate-900">
+                        {formatCurrency(extraBonusPreview.hourlyRate, language)}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {t.createModal.extraMultiplier.replace(
+                          '{percent}',
+                          `${extraBonusPreview.bonusPercent}%`
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs text-slate-500">{t.createModal.extraMissing}</p>
+                )}
+              </div>
+            )}
 
             {selectedType ? (
               <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-5">
@@ -308,6 +666,9 @@ export const CreateApplicationModal: React.FC<CreateApplicationModalProps> = ({
           </div>
 
           {error && <div className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-600">{error}</div>}
+          {scheduleValidation && (
+            <div className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">{scheduleValidation}</div>
+          )}
           {success && <div className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</div>}
 
           <div className="mt-6 flex items-center justify-between">

@@ -15,6 +15,15 @@ export const ALL_PERMISSIONS: Permission[] = [
   { id: 'approve_requests', name: 'Approve requests', category: 'Requests' },
   { id: 'manage_request_types', name: 'Manage request types', category: 'Requests' },
   { id: 'print_requests', name: 'Print requests', category: 'Requests' },
+  { id: 'view_hr', name: 'Access HR workspace', category: 'HR' },
+  { id: 'manage_work_shifts', name: 'Manage work shifts', category: 'HR' },
+  { id: 'manage_lesson_bonuses', name: 'Manage lesson bonuses', category: 'HR' },
+  { id: 'view_payroll', name: 'View payroll workspace', category: 'Payroll' },
+  { id: 'manage_payroll', name: 'Create and finalize payroll', category: 'Payroll' },
+  { id: 'view_teacher_schedule', name: 'View teacher schedule', category: 'Teacher Schedule' },
+  { id: 'analyze_teacher_schedule', name: 'Analyze teacher schedule files', category: 'Teacher Schedule' },
+  { id: 'assign_teacher_schedule', name: 'Assign teacher schedule records', category: 'Teacher Schedule' },
+  { id: 'manage_learning', name: 'Manage learning workspace', category: 'Learning' },
   { id: 'reset_passwords', name: 'Reset passwords', category: 'System' },
   { id: 'manage_permissions', name: 'Manage permissions', category: 'System' }
 ];
@@ -36,6 +45,15 @@ export const PERMISSION_LABELS: Record<string, { ka: string; en: string }> = {
   approve_requests: label('Approve requests'),
   manage_request_types: label('Manage request types'),
   print_requests: label('Print requests'),
+  view_hr: label('Access HR workspace'),
+  manage_work_shifts: label('Manage work shifts'),
+  manage_lesson_bonuses: label('Manage lesson bonuses'),
+  view_payroll: label('View payroll workspace'),
+  manage_payroll: label('Create and finalize payroll'),
+  view_teacher_schedule: label('View teacher schedule'),
+  analyze_teacher_schedule: label('Analyze teacher schedule files'),
+  assign_teacher_schedule: label('Assign teacher schedule records'),
+  manage_learning: label('Manage learning workspace'),
   reset_passwords: label('Reset passwords'),
   manage_permissions: label('Manage permissions')
 };
@@ -45,5 +63,9 @@ export const PERMISSION_CATEGORY_LABELS: Record<string, { ka: string; en: string
   Users: label('Users'),
   Roles: label('Roles'),
   Requests: label('Requests'),
+  HR: label('HR'),
+  Payroll: label('Payroll'),
+  'Teacher Schedule': label('Teacher schedule'),
+  Learning: label('Learning'),
   System: label('System')
 };

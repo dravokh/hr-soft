@@ -36,6 +36,7 @@ import {
   splitRange
 } from '../utils';
 import { AttachmentDraft } from '../types';
+import { formatMinutes } from '../../../utils/usage';
 
 interface ApplicationDetailModalProps {
   selected: ApplicationBundle;
@@ -67,6 +68,16 @@ interface ApplicationDetailModalProps {
   onEditFileUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
   editFileInputRef: React.RefObject<HTMLInputElement>;
 }
+
+const formatCurrency = (value: number, language: 'ka' | 'en'): string => {
+  const formatter = new Intl.NumberFormat(language === 'ka' ? 'ka-GE' : 'en-US', {
+    style: 'currency',
+    currency: 'GEL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+  return formatter.format(Number.isFinite(value) ? value : 0);
+};
 
 export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
   selected,
@@ -517,6 +528,41 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
           )}
           {type && <p className="text-xs text-slate-600 bg-slate-100 rounded px-2 py-1 inline-block">{type.description[language]}</p>}
         </div>
+
+        {bundle.extraBonus && (
+          <div className="rounded-lg bg-emerald-50 p-5 border border-emerald-200 shadow-sm">
+            <p className="text-xs uppercase tracking-wider font-semibold text-emerald-700 mb-2">
+              {t.createModal.extraTitle}
+            </p>
+            <p className="text-2xl font-bold text-emerald-700">
+              {formatCurrency(bundle.extraBonus.totalAmount, language)}
+            </p>
+            <p className="text-xs text-emerald-700 mt-1">
+              {formatDate(bundle.extraBonus.workDate, language)}
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-3 text-sm text-slate-700">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-400">
+                  {t.createModal.extraHours}
+                </p>
+                <p className="font-semibold text-slate-900">
+                  {formatMinutes(bundle.extraBonus.minutes)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-400">
+                  {t.createModal.extraRate}
+                </p>
+                <p className="font-semibold text-slate-900">
+                  {formatCurrency(bundle.extraBonus.hourlyRate, language)}
+                </p>
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              {t.createModal.extraMultiplier.replace('{percent}', `{bundle.extraBonus.bonusPercent}%`)}
+            </p>
+          </div>
+        )}
 
         <div className="rounded-lg bg-white p-5 border border-slate-200 shadow-sm">
           <div className="space-y-3">

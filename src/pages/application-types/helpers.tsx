@@ -1,6 +1,31 @@
-import type { ApplicationFieldDefinition, ApplicationType } from '../../types';
+import type {
+  ApplicationFieldDefinition,
+  ApplicationType,
+  ApplicationTypeCapabilities
+} from '../../types';
 import type { FormState, SlaFormEntry } from './types';
 import { DEFAULT_COMMENT_PLACEHOLDER, DEFAULT_REASON_PLACEHOLDER } from './copy';
+
+export const coerceUsageCapabilities = (
+  capabilities: ApplicationTypeCapabilities
+): ApplicationTypeCapabilities => {
+  const next: ApplicationTypeCapabilities = { ...capabilities };
+  if (next.usesVacationCalculator) {
+    next.requiresDateRange = true;
+    next.dateRangeRequired = true;
+  }
+  if (next.usesGracePeriodTracker || next.usesPenaltyTracker) {
+    next.requiresTimeRange = true;
+    next.timeRangeRequired = true;
+  }
+  if (next.usesExtraBonusTracker) {
+    next.requiresDateRange = true;
+    next.dateRangeRequired = true;
+    next.requiresTimeRange = true;
+    next.timeRangeRequired = true;
+  }
+  return next;
+};
 
 export const syncSlaWithFlow = (flow: number[], current: SlaFormEntry[]): SlaFormEntry[] => {
   const existing = new Map(current.map((entry) => [entry.stepIndex, entry] as const));
@@ -19,7 +44,7 @@ export const syncSlaWithFlow = (flow: number[], current: SlaFormEntry[]): SlaFor
 export const buildDefaultFormState = (): FormState => ({
   nameKa: '',
   descriptionKa: '',
-  capabilities: {
+  capabilities: coerceUsageCapabilities({
     requiresDateRange: true,
     dateRangeRequired: true,
     requiresTimeRange: false,
@@ -28,8 +53,12 @@ export const buildDefaultFormState = (): FormState => ({
     commentRequired: false,
     allowsAttachments: true,
     attachmentsRequired: false,
-    attachmentMaxSizeMb: 50
-  },
+    attachmentMaxSizeMb: 50,
+    usesVacationCalculator: false,
+    usesGracePeriodTracker: false,
+    usesPenaltyTracker: false,
+    usesExtraBonusTracker: false
+  }),
   flow: [],
   sla: [],
   allowedRoleIds: []
@@ -39,7 +68,21 @@ export const buildFormStateFromType = (type: ApplicationType): FormState => {
   const form: FormState = {
     nameKa: type.name.ka,
     descriptionKa: type.description.ka,
-    capabilities: { ...type.capabilities },
+    capabilities: coerceUsageCapabilities({
+      requiresDateRange: type.capabilities.requiresDateRange,
+      dateRangeRequired: type.capabilities.dateRangeRequired,
+      requiresTimeRange: type.capabilities.requiresTimeRange,
+      timeRangeRequired: type.capabilities.timeRangeRequired,
+      hasCommentField: type.capabilities.hasCommentField,
+      commentRequired: type.capabilities.commentRequired,
+      allowsAttachments: type.capabilities.allowsAttachments,
+      attachmentsRequired: type.capabilities.attachmentsRequired,
+      attachmentMaxSizeMb: type.capabilities.attachmentMaxSizeMb,
+      usesVacationCalculator: Boolean(type.capabilities.usesVacationCalculator),
+      usesGracePeriodTracker: Boolean(type.capabilities.usesGracePeriodTracker),
+      usesPenaltyTracker: Boolean(type.capabilities.usesPenaltyTracker),
+      usesExtraBonusTracker: Boolean(type.capabilities.usesExtraBonusTracker)
+    }),
     flow: [...type.flow],
     sla: type.slaPerStep.map((entry) => ({
       stepIndex: entry.stepIndex,

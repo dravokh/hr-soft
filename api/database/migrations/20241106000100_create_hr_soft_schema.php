@@ -17,6 +17,7 @@ final class CreateHrSoftSchema extends AbstractMigration
         $this->createApplicationTypeSlaTable();
         $this->createApplicationsTable();
         $this->createApplicationFieldValuesTable();
+        $this->createApplicationExtraBonusesTable();
         $this->createApplicationAttachmentsTable();
         $this->createApplicationAuditLogTable();
         $this->createApplicationDelegatesTable();
@@ -32,6 +33,7 @@ final class CreateHrSoftSchema extends AbstractMigration
             'application_delegates',
             'application_audit_log',
             'application_attachments',
+            'application_extra_bonuses',
             'application_field_values',
             'applications',
             'application_type_sla',
@@ -127,6 +129,7 @@ final class CreateHrSoftSchema extends AbstractMigration
             ->addColumn('email', 'string', ['limit' => 150])
             ->addColumn('phone', 'string', ['limit' => 30, 'null' => true])
             ->addColumn('personal_id', 'string', ['limit' => 20])
+            ->addColumn('subject', 'string', ['limit' => 150, 'null' => true])
             ->addColumn('password', 'string', ['limit' => 150])
             ->addColumn('role_id', 'integer')
             ->addColumn('avatar', 'string', ['limit' => 5, 'null' => true])
@@ -156,6 +159,10 @@ final class CreateHrSoftSchema extends AbstractMigration
             ->addColumn('description_en', 'string', ['limit' => 255])
             ->addColumn('icon', 'string', ['limit' => 50])
             ->addColumn('color', 'string', ['limit' => 30])
+            ->addColumn('uses_vacation_calculator', 'boolean', ['default' => 0])
+            ->addColumn('uses_grace_period_tracker', 'boolean', ['default' => 0])
+            ->addColumn('uses_penalty_tracker', 'boolean', ['default' => 0])
+            ->addColumn('uses_extra_bonus_tracker', 'boolean', ['default' => 0])
             ->create();
     }
 
@@ -275,6 +282,32 @@ final class CreateHrSoftSchema extends AbstractMigration
             ->addColumn('field_key', 'string', ['limit' => 100])
             ->addColumn('value', 'text')
             ->addForeignKey('application_id', 'applications', 'id', ['delete' => 'CASCADE', 'update' => 'CASCADE'])
+            ->create();
+    }
+
+    private function createApplicationExtraBonusesTable(): void
+    {
+        if ($this->hasTable('application_extra_bonuses')) {
+            return;
+        }
+
+        $this->table('application_extra_bonuses', [
+            'id' => false,
+            'primary_key' => ['application_id'],
+            'engine' => 'InnoDB',
+            'encoding' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+        ])
+            ->addColumn('application_id', 'integer')
+            ->addColumn('user_id', 'integer')
+            ->addColumn('work_date', 'date')
+            ->addColumn('time_minutes', 'integer', ['default' => 0])
+            ->addColumn('hourly_rate', 'decimal', ['precision' => 10, 'scale' => 2, 'default' => 0])
+            ->addColumn('bonus_percent', 'decimal', ['precision' => 5, 'scale' => 2, 'default' => 0])
+            ->addColumn('bonus_amount', 'decimal', ['precision' => 10, 'scale' => 2, 'default' => 0])
+            ->addColumn('created_at', 'datetime')
+            ->addForeignKey('application_id', 'applications', 'id', ['delete' => 'CASCADE', 'update' => 'CASCADE'])
+            ->addForeignKey('user_id', 'users', 'id', ['delete' => 'CASCADE', 'update' => 'CASCADE'])
             ->create();
     }
 

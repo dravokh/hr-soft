@@ -6,11 +6,16 @@ namespace App\Http;
 use App\Config\AppConfig;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\ApplicationTypeController;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BootstrapController;
 use App\Http\Controllers\CompensationBonusController;
 use App\Http\Controllers\HealthController;
+use App\Http\Controllers\LearningController;
+use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\TeacherScheduleController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\WorkCalendarController;
 use App\Http\Exceptions\HttpException;
 use Throwable;
 
@@ -72,6 +77,11 @@ final class Kernel
         $applicationTypes = new ApplicationTypeController($this->config);
         $applications = new ApplicationController($this->config);
         $compensationBonuses = new CompensationBonusController($this->config);
+        $teacherSchedule = new TeacherScheduleController($this->config);
+        $workCalendar = new WorkCalendarController($this->config);
+        $payroll = new PayrollController($this->config);
+        $learning = new LearningController($this->config);
+        $auth = new AuthController($this->config);
 
         $this->router->get('/health', fn () => $health->check());
         $this->router->get('/bootstrap.php', fn () => $bootstrap->index());
@@ -86,6 +96,23 @@ final class Kernel
         $this->router->put('/application-types', fn () => $applicationTypes->sync());
         $this->router->post('/applications', fn () => $applications->sync());
         $this->router->put('/applications', fn () => $applications->sync());
+        $this->router->post('/teacher-schedule/analyze', fn () => $teacherSchedule->analyze());
+        $this->router->post('/teacher-schedule/assign', fn () => $teacherSchedule->assign());
+        $this->router->get('/teacher-schedule/assignments', fn () => $teacherSchedule->assignments());
+        $this->router->get('/teacher-schedule/bonus', fn () => $teacherSchedule->bonusRates());
+        $this->router->post('/teacher-schedule/bonus', fn () => $teacherSchedule->saveBonusRates());
+        $this->router->get('/work-calendar', fn () => $workCalendar->index());
+        $this->router->put('/work-calendar', fn () => $workCalendar->sync());
+        $this->router->get('/payroll/batches', fn () => $payroll->index());
+        $this->router->get('/payroll/batch', fn () => $payroll->show());
+        $this->router->get('/payroll/stats', fn () => $payroll->summary());
+        $this->router->post('/payroll/batches/create', fn () => $payroll->create());
+        $this->router->post('/payroll/batches/update-status', fn () => $payroll->updateStatus());
+        $this->router->get('/learning/class-hours', fn () => $learning->classHours());
+        $this->router->post('/learning/class-hours', fn () => $learning->saveClassHours());
+        $this->router->post('/auth/login', fn () => $auth->login());
+        $this->router->post('/auth/reset/initiate', fn () => $auth->initiatePasswordReset());
+        $this->router->post('/auth/reset/complete', fn () => $auth->completePasswordReset());
     }
 
     private function applyCors(array $server): void

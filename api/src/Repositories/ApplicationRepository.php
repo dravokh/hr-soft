@@ -44,6 +44,7 @@ final class ApplicationRepository
                 'attachments' => [],
                 'auditTrail' => [],
                 'delegates' => [],
+                'extraBonus' => null,
             ];
         }
 
@@ -134,6 +135,29 @@ final class ApplicationRepository
             ];
         }
 
+        $bonusStatement = $this->connection->query(
+            'SELECT application_id, user_id, work_date, time_minutes, hourly_rate, bonus_percent, bonus_amount, created_at
+             FROM application_extra_bonuses'
+        );
+
+        foreach ($bonusStatement as $row) {
+            $appId = (int) $row['application_id'];
+            if (!isset($applications[$appId])) {
+                continue;
+            }
+
+            $applications[$appId]['extraBonus'] = [
+                'applicationId' => $appId,
+                'userId' => (int) $row['user_id'],
+                'workDate' => (string) $row['work_date'],
+                'minutes' => (int) $row['time_minutes'],
+                'hourlyRate' => (float) $row['hourly_rate'],
+                'bonusPercent' => (float) $row['bonus_percent'],
+                'totalAmount' => (float) $row['bonus_amount'],
+                'createdAt' => Date::toIsoString($row['created_at']),
+            ];
+        }
+
         return array_values($applications);
     }
 
@@ -148,6 +172,7 @@ final class ApplicationRepository
             $this->connection->exec('DELETE FROM application_delegates');
             $this->connection->exec('DELETE FROM application_audit_log');
             $this->connection->exec('DELETE FROM application_attachments');
+            $this->connection->exec('DELETE FROM application_extra_bonuses');
             $this->connection->exec('DELETE FROM application_field_values');
 
             if ($bundles === []) {
@@ -267,6 +292,28 @@ final class ApplicationRepository
                 )'
             );
 
+            $insertBonus = $this->connection->prepare(
+                'INSERT INTO application_extra_bonuses (
+                    application_id,
+                    user_id,
+                    work_date,
+                    time_minutes,
+                    hourly_rate,
+                    bonus_percent,
+                    bonus_amount,
+                    created_at
+                ) VALUES (
+                    :application_id,
+                    :user_id,
+                    :work_date,
+                    :time_minutes,
+                    :hourly_rate,
+                    :bonus_percent,
+                    :bonus_amount,
+                    :created_at
+                )'
+            );
+
             foreach ($bundles as $bundle) {
                 $application = $bundle['application'] ?? null;
                 if (!is_array($application)) {
@@ -337,6 +384,20 @@ final class ApplicationRepository
                             ':delegate_user_id' => (int) ($delegate['delegateUserId'] ?? 0),
                         ]);
                     }
+                }
+
+                $extraBonus = $bundle['extraBonus'] ?? null;
+                if (is_array($extraBonus)) {
+                    $insertBonus->execute([
+                        ':application_id' => $applicationId,
+                        ':user_id' => (int) ($extraBonus['userId'] ?? 0),
+                        ':work_date' => (string) ($extraBonus['workDate'] ?? ''),
+                        ':time_minutes' => (int) ($extraBonus['minutes'] ?? 0),
+                        ':hourly_rate' => (float) ($extraBonus['hourlyRate'] ?? 0),
+                        ':bonus_percent' => (float) ($extraBonus['bonusPercent'] ?? 0),
+                        ':bonus_amount' => (float) ($extraBonus['totalAmount'] ?? 0),
+                        ':created_at' => Date::fromIsoString($extraBonus['createdAt'] ?? null),
+                    ]);
                 }
             }
 

@@ -3,11 +3,13 @@ import { ChevronDown, Clock3, PlusCircle, Save, ShieldCheck, PencilLine, Trash2 
 import type { Role } from '../../../types';
 import type {
   ApplicationType,
+  ApplicationTypeCapabilities,
   FormState,
   Mode,
   SlaFormEntry
 } from '../types';
 import type { ApplicationTypesCopy } from '../copy';
+import { coerceUsageCapabilities } from '../helpers';
 
 interface ApplicationTypeEditorProps {
   language: 'ka' | 'en';
@@ -70,6 +72,22 @@ export const ApplicationTypeEditor: React.FC<ApplicationTypeEditorProps> = ({
     { key: 'allowsAttachments', requiredKey: 'attachmentsRequired' }
   ];
 
+  const updateCapabilities = (
+    updater: (current: ApplicationTypeCapabilities) => ApplicationTypeCapabilities
+  ) => {
+    onFormChange((prev) => ({
+      ...prev,
+      capabilities: coerceUsageCapabilities(updater(prev.capabilities))
+    }));
+  };
+
+  const lockDateRange =
+    formState.capabilities.usesVacationCalculator || formState.capabilities.usesExtraBonusTracker;
+  const lockTimeRange =
+    formState.capabilities.usesGracePeriodTracker ||
+    formState.capabilities.usesPenaltyTracker ||
+    formState.capabilities.usesExtraBonusTracker;
+
   return (
     <div className="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
       <div>
@@ -110,6 +128,59 @@ export const ApplicationTypeEditor: React.FC<ApplicationTypeEditorProps> = ({
             />
           </div>
         </div>
+
+        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
+          <div>
+            <p className="text-sm font-semibold text-slate-800">{copy.usage.title}</p>
+            <p className="text-xs text-slate-500">{copy.usage.description}</p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={formState.capabilities.usesVacationCalculator}
+                onChange={(event) =>
+                  updateCapabilities((current) => ({ ...current, usesVacationCalculator: event.target.checked }))
+                }
+                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              {copy.usage.vacation}
+            </label>
+            <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={formState.capabilities.usesGracePeriodTracker}
+                onChange={(event) =>
+                  updateCapabilities((current) => ({ ...current, usesGracePeriodTracker: event.target.checked }))
+                }
+                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              {copy.usage.grace}
+            </label>
+            <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={formState.capabilities.usesPenaltyTracker}
+                onChange={(event) =>
+                  updateCapabilities((current) => ({ ...current, usesPenaltyTracker: event.target.checked }))
+                }
+                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              {copy.usage.penalty}
+            </label>
+            <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={formState.capabilities.usesExtraBonusTracker}
+                onChange={(event) =>
+                  updateCapabilities((current) => ({ ...current, usesExtraBonusTracker: event.target.checked }))
+                }
+                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              {copy.usage.extra}
+            </label>
+          </div>
+        </div>
       </section>
 
       <section className="space-y-4">
@@ -118,6 +189,13 @@ export const ApplicationTypeEditor: React.FC<ApplicationTypeEditorProps> = ({
           {capabilityRows.map((config) => {
             const enabled = formState.capabilities[config.key];
             const required = formState.capabilities[config.requiredKey];
+            const lockKey =
+              (config.key === 'requiresDateRange' && lockDateRange) ||
+              (config.key === 'requiresTimeRange' && lockTimeRange);
+            const lockRequired =
+              (config.requiredKey === 'dateRangeRequired' && lockDateRange) ||
+              (config.requiredKey === 'timeRangeRequired' && lockTimeRange);
+
             return (
               <div
                 key={config.key}
@@ -127,40 +205,32 @@ export const ApplicationTypeEditor: React.FC<ApplicationTypeEditorProps> = ({
                   <input
                     type="checkbox"
                     checked={enabled}
+                    disabled={lockKey}
                     onChange={(event) =>
-                      onFormChange((prev) => {
-                        const nextCapabilities = {
-                          ...prev.capabilities,
-                          [config.key]: event.target.checked
-                        } as typeof prev.capabilities;
-                        if (!event.target.checked) {
-                          nextCapabilities[config.requiredKey] = false;
-                        }
-                        return {
-                          ...prev,
-                          capabilities: nextCapabilities
-                        };
-                      })
+                      updateCapabilities((current) => ({
+                        ...current,
+                        [config.key]: event.target.checked,
+                        [config.requiredKey]: event.target.checked
+                          ? current[config.requiredKey]
+                          : false
+                      }))
                     }
-                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100"
                   />
                   {copy.toggles[config.key]}
                 </label>
-                <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500">
+                <label className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-500">
                   <input
                     type="checkbox"
                     checked={required}
-                    disabled={!enabled}
+                    disabled={!enabled || lockRequired}
                     onChange={(event) =>
-                      onFormChange((prev) => ({
-                        ...prev,
-                        capabilities: {
-                          ...prev.capabilities,
-                          [config.requiredKey]: event.target.checked
-                        }
+                      updateCapabilities((current) => ({
+                        ...current,
+                        [config.requiredKey]: event.target.checked
                       }))
                     }
-                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
                   />
                   {copy.requiredLabel}
                 </label>
@@ -385,3 +455,4 @@ export const ApplicationTypeEditor: React.FC<ApplicationTypeEditorProps> = ({
     </div>
   );
 };
+

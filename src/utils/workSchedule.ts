@@ -24,15 +24,15 @@ const DEFAULT_DAY_CONFIG: Record<Weekday, WorkScheduleDefaults> = {
 
 const TIME_PATTERN = /^(\d{1,2}):(\d{2})$/;
 
-const normalizeTimeValue = (value: string | null | undefined, fallback: string): string => {
+const normalizeTimeValue = (value: string | null | undefined, fallback: string | null): string => {
   if (typeof value !== 'string') {
-    return fallback;
+    return fallback ?? '09:00';
   }
 
   const trimmed = value.trim();
   const match = TIME_PATTERN.exec(trimmed);
   if (!match) {
-    return fallback;
+    return fallback ?? '09:00';
   }
 
   const hours = Math.min(23, Math.max(0, Number(match[1])));
@@ -64,8 +64,11 @@ export const sanitizeWorkSchedule = (entries?: WorkScheduleDay[] | null): WorkSc
     lookup.set(day, {
       dayOfWeek: day,
       isWorking: Boolean(entry.isWorking),
-      startTime: normalizeTimeValue(entry.startTime, defaults.startTime),
-      endTime: normalizeTimeValue(entry.endTime, defaults.endTime),
+      startTime: normalizeTimeValue(
+        (entry.startTime ?? defaults.startTime) as string,
+        defaults.startTime
+      ),
+      endTime: normalizeTimeValue((entry.endTime ?? defaults.endTime) as string, defaults.endTime),
       breakMinutes: normalizeBreakMinutes(entry.breakMinutes, defaults.breakMinutes)
     });
   });

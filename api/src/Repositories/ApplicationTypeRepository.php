@@ -17,7 +17,11 @@ final class ApplicationTypeRepository
         $types = [];
 
         $typeStatement = $this->connection->query(
-            'SELECT id, name_ka, name_en, description_ka, description_en, icon, color
+            'SELECT id, name_ka, name_en, description_ka, description_en, icon, color,
+                    uses_vacation_calculator,
+                    uses_grace_period_tracker,
+                    uses_penalty_tracker,
+                    uses_extra_bonus_tracker
              FROM application_types
              ORDER BY id'
         );
@@ -41,6 +45,12 @@ final class ApplicationTypeRepository
                 'slaPerStep' => [],
                 'capabilities' => [],
                 'allowedRoleIds' => [],
+                'capabilityOverrides' => [
+                    'usesVacationCalculator' => (bool) $row['uses_vacation_calculator'],
+                    'usesGracePeriodTracker' => (bool) $row['uses_grace_period_tracker'],
+                    'usesPenaltyTracker' => (bool) $row['uses_penalty_tracker'],
+                    'usesExtraBonusTracker' => (bool) $row['uses_extra_bonus_tracker'],
+                ],
             ];
         }
 
@@ -122,7 +132,9 @@ final class ApplicationTypeRepository
             ksort($type['flow']);
             $type['flow'] = array_values($type['flow']);
             $type['allowedRoleIds'] = array_values(array_unique($type['flow']));
-            $type['capabilities'] = $this->inferCapabilities($type['fields'], $typeId);
+            $overrides = $type['capabilityOverrides'] ?? [];
+            $type['capabilities'] = $this->inferCapabilities($type['fields'], $typeId, $overrides);
+            unset($type['capabilityOverrides']);
 
             foreach ($type['fields'] as &$field) {
                 if ($field['placeholder'] === null) {
@@ -177,15 +189,43 @@ final class ApplicationTypeRepository
             }
 
             $upsertType = $this->connection->prepare(
-                'INSERT INTO application_types (id, name_ka, name_en, description_ka, description_en, icon, color)
-                 VALUES (:id, :name_ka, :name_en, :description_ka, :description_en, :icon, :color)
+                'INSERT INTO application_types (
+                    id,
+                    name_ka,
+                    name_en,
+                    description_ka,
+                    description_en,
+                    icon,
+                    color,
+                    uses_vacation_calculator,
+                    uses_grace_period_tracker,
+                    uses_penalty_tracker,
+                    uses_extra_bonus_tracker
+                 )
+                 VALUES (
+                    :id,
+                    :name_ka,
+                    :name_en,
+                    :description_ka,
+                    :description_en,
+                    :icon,
+                    :color,
+                    :uses_vacation_calculator,
+                    :uses_grace_period_tracker,
+                    :uses_penalty_tracker,
+                    :uses_extra_bonus_tracker
+                 )
                  ON DUPLICATE KEY UPDATE
                     name_ka = VALUES(name_ka),
                     name_en = VALUES(name_en),
                     description_ka = VALUES(description_ka),
                     description_en = VALUES(description_en),
                     icon = VALUES(icon),
-                    color = VALUES(color)'
+                    color = VALUES(color),
+                    uses_vacation_calculator = VALUES(uses_vacation_calculator),
+                    uses_grace_period_tracker = VALUES(uses_grace_period_tracker),
+                    uses_penalty_tracker = VALUES(uses_penalty_tracker),
+                    uses_extra_bonus_tracker = VALUES(uses_extra_bonus_tracker)'
             );
 
             $insertField = $this->connection->prepare(
@@ -229,6 +269,8 @@ final class ApplicationTypeRepository
                 $name = $type['name'] ?? ['ka' => '', 'en' => ''];
                 $description = $type['description'] ?? ['ka' => '', 'en' => ''];
 
+                $capabilities = $type['capabilities'] ?? [];
+
                 $upsertType->execute([
                     ':id' => $typeId,
                     ':name_ka' => (string) ($name['ka'] ?? ''),
@@ -237,6 +279,10 @@ final class ApplicationTypeRepository
                     ':description_en' => (string) ($description['en'] ?? ''),
                     ':icon' => (string) ($type['icon'] ?? ''),
                     ':color' => (string) ($type['color'] ?? ''),
+                    ':uses_vacation_calculator' => !empty($capabilities['usesVacationCalculator']) ? 1 : 0,
+                    ':uses_grace_period_tracker' => !empty($capabilities['usesGracePeriodTracker']) ? 1 : 0,
+                    ':uses_penalty_tracker' => !empty($capabilities['usesPenaltyTracker']) ? 1 : 0,
+                    ':uses_extra_bonus_tracker' => !empty($capabilities['usesExtraBonusTracker']) ? 1 : 0,
                 ]);
 
                 $fields = $type['fields'] ?? [];
@@ -304,7 +350,7 @@ final class ApplicationTypeRepository
         return empty($data) ? null : $data;
     }
 
-    private function inferCapabilities(array $fields, int $typeId): array
+    private function inferCapabilities(array $fields, int $typeId, array $overrides = []): array
     {
         $hasStartDate = false;
         $hasEndDate = false;
@@ -387,6 +433,10 @@ final class ApplicationTypeRepository
             'allowsAttachments' => true,
             'attachmentsRequired' => $typeId === 2,
             'attachmentMaxSizeMb' => 50,
+            'usesVacationCalculator' => (bool) ($overrides['usesVacationCalculator'] ?? false),
+            'usesGracePeriodTracker' => (bool) ($overrides['usesGracePeriodTracker'] ?? false),
+            'usesPenaltyTracker' => (bool) ($overrides['usesPenaltyTracker'] ?? false),
+            'usesExtraBonusTracker' => (bool) ($overrides['usesExtraBonusTracker'] ?? false),
         ];
     }
 }

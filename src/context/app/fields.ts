@@ -63,7 +63,11 @@ export const ensureCapabilities = (
   commentRequired: capabilities?.commentRequired ?? false,
   allowsAttachments: capabilities?.allowsAttachments ?? false,
   attachmentsRequired: capabilities?.attachmentsRequired ?? false,
-  attachmentMaxSizeMb: capabilities?.attachmentMaxSizeMb ?? 50
+  attachmentMaxSizeMb: capabilities?.attachmentMaxSizeMb ?? 50,
+  usesVacationCalculator: capabilities?.usesVacationCalculator ?? false,
+  usesGracePeriodTracker: capabilities?.usesGracePeriodTracker ?? false,
+  usesPenaltyTracker: capabilities?.usesPenaltyTracker ?? false,
+  usesExtraBonusTracker: capabilities?.usesExtraBonusTracker ?? false
 });
 
 export const buildFieldsForCapabilities = (

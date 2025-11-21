@@ -17,6 +17,7 @@ USE `hr_soft`;
 DROP TABLE IF EXISTS `application_delegates`;
 DROP TABLE IF EXISTS `application_audit_log`;
 DROP TABLE IF EXISTS `application_attachments`;
+DROP TABLE IF EXISTS `application_extra_bonuses`;
 DROP TABLE IF EXISTS `application_field_values`;
 DROP TABLE IF EXISTS `applications`;
 DROP TABLE IF EXISTS `application_type_sla`;
@@ -26,6 +27,8 @@ DROP TABLE IF EXISTS `application_types`;
 DROP TABLE IF EXISTS `sessions`;
 DROP TABLE IF EXISTS `tickets`;
 DROP TABLE IF EXISTS `user_compensation_bonuses`;
+DROP TABLE IF EXISTS `user_work_schedules`;
+DROP TABLE IF EXISTS `teacher_class_hours`;
 DROP TABLE IF EXISTS `compensation_bonuses`;
 DROP TABLE IF EXISTS `role_permissions`;
 DROP TABLE IF EXISTS `users`;
@@ -54,24 +57,35 @@ CREATE TABLE `permissions` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `permissions` (`id`, `name`, `category`) VALUES
-  ('view_dashboard', 'ßâ¢ßâùßâÉßâòßâÉßâáßâÿ ßâÆßâòßâößâáßâôßâÿßâí ßâ£ßâÉßâ«ßâòßâÉ', 'Dashboard'),
-  ('view_users', 'ßâ¢ßâ¥ßâ¢ßâ«ßâ¢ßâÉßâáßâößâæßâÜßâößâæßâÿßâí ßâ£ßâÉßâ«ßâòßâÉ', 'Users'),
-  ('create_users', 'ßâ¢ßâ¥ßâ¢ßâ«ßâ¢ßâÉßâáßâößâæßâÜßâößâæßâÿßâí ßâ¿ßâößâÑßâ¢ßâ£ßâÉ', 'Users'),
-  ('edit_users', 'ßâ¢ßâ¥ßâ¢ßâ«ßâ¢ßâÉßâáßâößâæßâÜßâößâæßâÿßâí ßâáßâößâôßâÉßâÑßâóßâÿßâáßâößâæßâÉ', 'Users'),
-  ('delete_users', 'ßâ¢ßâ¥ßâ¢ßâ«ßâ¢ßâÉßâáßâößâæßâÜßâößâæßâÿßâí ßâ¼ßâÉßâ¿ßâÜßâÉ', 'Users'),
-  ('view_roles', 'ßâáßâ¥ßâÜßâößâæßâÿßâí ßâ£ßâÉßâ«ßâòßâÉ', 'Roles'),
-  ('create_roles', 'ßâáßâ¥ßâÜßâößâæßâÿßâí ßâ¿ßâößâÑßâ¢ßâ£ßâÉ', 'Roles'),
-  ('edit_roles', 'ßâáßâ¥ßâÜßâößâæßâÿßâí ßâáßâößâôßâÉßâÑßâóßâÿßâáßâößâæßâÉ', 'Roles'),
-  ('delete_roles', 'ßâáßâ¥ßâÜßâößâæßâÿßâí ßâ¼ßâÉßâ¿ßâÜßâÉ', 'Roles'),
-  ('view_requests', 'ßâ¢ßâ¥ßâùßâ«ßâ¥ßâòßâ£ßâößâæßâÿßâí ßâ£ßâÉßâ«ßâòßâÉ', 'Requests'),
-  ('create_requests', 'ßâ¢ßâ¥ßâùßâ«ßâ¥ßâòßâ£ßâößâæßâÿßâí ßâ¿ßâößâÑßâ¢ßâ£ßâÉ', 'Requests'),
-  ('approve_requests', 'ßâ¢ßâ¥ßâùßâ«ßâ¥ßâòßâ£ßâößâæßâÿßâí ßâôßâÉßâ¢ßâóßâÖßâÿßâ¬ßâößâæßâÉ', 'Requests'),
-  ('view_tickets', 'ßâíßâößâáßâòßâÿßâí ßâùßâÿßâÖßâößâóßâößâæßâÿßâí ßâ£ßâÉßâ«ßâòßâÉ', 'Tickets'),
-  ('create_tickets', 'ßâíßâößâáßâòßâÿßâí ßâùßâÿßâÖßâößâóßâößâæßâÿßâí ßâ¿ßâößâÑßâ¢ßâ£ßâÉ', 'Tickets'),
-  ('update_tickets', 'ßâíßâößâáßâòßâÿßâí ßâùßâÿßâÖßâößâóßâößâæßâÿßâí ßâÆßâÉßâ£ßâÉßâ«ßâÜßâößâæßâÉ', 'Tickets'),
-  ('set_ticket_priority', 'ßâùßâÿßâÖßâößâóßâößâæßâÿßâí ßâ₧ßâáßâÿßâ¥ßâáßâÿßâóßâößâóßâößâæßâÿßâí ßâ¢ßâÉßâáßâùßâòßâÉ', 'Tickets'),
-  ('manage_request_types', 'ßâÆßâÉßâ£ßâÉßâ¬ßâ«ßâÉßâôßâößâæßâÿßâí ßâóßâÿßâ₧ßâößâæßâÿßâí ßâ¢ßâÉßâáßâùßâòßâÉ', 'Requests'),
-  ('manage_permissions', 'ßâúßâñßâÜßâößâæßâößâæßâÿßâí ßâ¢ßâÉßâáßâùßâòßâÉ', 'System');
+  ('view_dashboard', 'View dashboard', 'Dashboard'),
+  ('view_users', 'View users', 'Users'),
+  ('create_users', 'Create users', 'Users'),
+  ('edit_users', 'Edit users', 'Users'),
+  ('delete_users', 'Delete users', 'Users'),
+  ('view_roles', 'View roles', 'Roles'),
+  ('create_roles', 'Create roles', 'Roles'),
+  ('edit_roles', 'Edit roles', 'Roles'),
+  ('delete_roles', 'Delete roles', 'Roles'),
+  ('view_requests', 'View requests', 'Requests'),
+  ('create_requests', 'Create requests', 'Requests'),
+  ('approve_requests', 'Approve requests', 'Requests'),
+  ('manage_request_types', 'Manage request types', 'Requests'),
+  ('print_requests', 'Print requests', 'Requests'),
+  ('view_tickets', 'View tickets', 'Tickets'),
+  ('create_tickets', 'Create tickets', 'Tickets'),
+  ('update_tickets', 'Update tickets', 'Tickets'),
+  ('set_ticket_priority', 'Set ticket priority', 'Tickets'),
+  ('view_hr', 'Access HR workspace', 'HR'),
+  ('manage_work_shifts', 'Manage work shifts', 'HR'),
+  ('manage_lesson_bonuses', 'Manage lesson bonuses', 'HR'),
+  ('view_payroll', 'View payroll workspace', 'Payroll'),
+  ('manage_payroll', 'Create and finalize payroll', 'Payroll'),
+  ('view_teacher_schedule', 'View teacher schedule', 'Teacher Schedule'),
+  ('analyze_teacher_schedule', 'Analyze teacher schedule files', 'Teacher Schedule'),
+  ('assign_teacher_schedule', 'Assign teacher schedule records', 'Teacher Schedule'),
+  ('manage_learning', 'Manage learning workspace', 'Learning'),
+  ('reset_passwords', 'Reset passwords', 'System'),
+  ('manage_permissions', 'Manage permissions', 'System');
 
 -- Junction table linking roles to their permissions
 CREATE TABLE `role_permissions` (
@@ -96,6 +110,13 @@ INSERT INTO `role_permissions` (`role_id`, `permission_id`) VALUES
   (2, 'view_users'),
   (2, 'view_requests'),
   (2, 'approve_requests'),
+  (2, 'view_hr'),
+  (2, 'manage_work_shifts'),
+  (2, 'manage_lesson_bonuses'),
+  (2, 'view_teacher_schedule'),
+  (2, 'analyze_teacher_schedule'),
+  (2, 'assign_teacher_schedule'),
+  (2, 'manage_learning'),
   (2, 'view_tickets'),
   (2, 'update_tickets'),
   (2, 'set_ticket_priority'),
@@ -118,11 +139,15 @@ CREATE TABLE `users` (
   `email` VARCHAR(150) NOT NULL,
   `phone` VARCHAR(30) NOT NULL,
   `personal_id` VARCHAR(20) NOT NULL,
+  `subject` VARCHAR(150) DEFAULT NULL,
   `password` VARCHAR(255) NOT NULL,
   `base_salary` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   `vacation_days` INT NOT NULL DEFAULT 24,
   `late_hours_allowed` INT NOT NULL DEFAULT 4,
   `penalty_percent` DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+  `vacation_days_used` INT NOT NULL DEFAULT 0,
+  `grace_minutes_used` INT NOT NULL DEFAULT 0,
+  `penalty_minutes_used` INT NOT NULL DEFAULT 0,
   `role_id` INT NOT NULL,
   `avatar` VARCHAR(5) NOT NULL,
   `must_reset_password` TINYINT(1) NOT NULL DEFAULT 0,
@@ -138,6 +163,7 @@ CREATE TABLE `compensation_bonuses` (
   `parent_id` INT DEFAULT NULL,
   `name` VARCHAR(255) NOT NULL,
   `percent` DECIMAL(5,2) DEFAULT NULL,
+  `amount` DECIMAL(10,2) DEFAULT NULL,
   PRIMARY KEY (`id`),
   CONSTRAINT `compensation_bonuses_parent_fk`
     FOREIGN KEY (`parent_id`) REFERENCES `compensation_bonuses` (`id`)
@@ -169,6 +195,19 @@ CREATE TABLE `user_work_schedules` (
     ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `teacher_class_hours` (
+  `user_id` INT NOT NULL,
+  `day_of_week` ENUM('monday','tuesday','wednesday','thursday','friday','saturday','sunday') NOT NULL,
+  `cambridge_hours` INT NOT NULL DEFAULT 0,
+  `georgian_hours` INT NOT NULL DEFAULT 0,
+  `created_at` DATETIME DEFAULT NULL,
+  `updated_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`user_id`, `day_of_week`),
+  CONSTRAINT `tch_user_fk`
+    FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 INSERT INTO `users` (
   `id`,
   `name`,
@@ -177,6 +216,7 @@ INSERT INTO `users` (
   `email`,
   `phone`,
   `personal_id`,
+  `subject`,
   `password`,
   `base_salary`,
   `vacation_days`,
@@ -186,22 +226,22 @@ INSERT INTO `users` (
   `avatar`,
   `must_reset_password`
 ) VALUES
-  (1, 'Admin User', 'Admin', 'User', 'admin@hr.com', '+995 555 000 001', '01001000001', 'admin123', 4500.00, 24, 4, 2.00, 1, 'A', 0),
-  (2, 'HR Manager', 'HR', 'Manager', 'hr@hr.com', '+995 555 000 002', '01001000002', 'hr123', 3200.00, 24, 4, 1.00, 2, 'H', 0),
-  (3, 'Employee User', 'Employee', 'User', 'user@hr.com', '+995 555 000 003', '01001000003', 'user123', 2200.00, 24, 4, 0.00, 3, 'E', 0);
+  (1, 'Admin User', 'Admin', 'User', 'admin@hr.com', '+995 555 000 001', '01001000001', 'Mathematics', 'admin123', 4500.00, 24, 4, 2.00, 1, 'A', 0),
+  (2, 'HR Manager', 'HR', 'Manager', 'hr@hr.com', '+995 555 000 002', '01001000002', 'Human Resources', 'hr123', 3200.00, 24, 4, 1.00, 2, 'H', 0),
+  (3, 'Employee User', 'Employee', 'User', 'user@hr.com', '+995 555 000 003', '01001000003', 'Science', 'user123', 2200.00, 24, 4, 0.00, 3, 'E', 0);
 
 ALTER TABLE `users`
   AUTO_INCREMENT = 4;
 
-INSERT INTO `compensation_bonuses` (`id`, `parent_id`, `name`, `percent`) VALUES
-  (1, NULL, 'განათლება', NULL),
-  (2, 1, 'ბაკალავრი', 5.00),
-  (3, 1, 'მაგისტრი', 10.00),
-  (4, 1, 'დოქტორი', 15.00),
-  (5, NULL, 'გამოცდილება', NULL),
-  (6, 5, '1-3 წელი', 5.00),
-  (7, 5, '3-5 წელი', 10.00),
-  (8, 5, '5+ წელი', 15.00);
+INSERT INTO `compensation_bonuses` (`id`, `parent_id`, `name`, `percent`, `amount`) VALUES
+  (1, NULL, '?????????', NULL, NULL),
+  (2, 1, '?????????', 5.00, NULL),
+  (3, 1, '????????', 10.00, NULL),
+  (4, 1, '???????', 15.00, NULL),
+  (5, NULL, '???????????', NULL, NULL),
+  (6, 5, '1-3 ????', 5.00, NULL),
+  (7, 5, '3-5 ????', 10.00, NULL),
+  (8, 5, '5+ ????', 15.00, NULL);
 
 INSERT INTO `user_compensation_bonuses` (`user_id`, `bonus_id`) VALUES
   (1, 4),
@@ -240,6 +280,36 @@ INSERT INTO `user_work_schedules` (
   (3, 'saturday', 0, NULL, NULL, 0),
   (3, 'sunday', 0, NULL, NULL, 0);
 
+INSERT INTO `teacher_class_hours` (
+  `user_id`,
+  `day_of_week`,
+  `cambridge_hours`,
+  `georgian_hours`,
+  `created_at`,
+  `updated_at`
+) VALUES
+  (1, 'monday', 0, 0, '2024-01-01 09:00:00', '2024-01-01 09:00:00'),
+  (1, 'tuesday', 0, 0, '2024-01-01 09:00:00', '2024-01-01 09:00:00'),
+  (1, 'wednesday', 0, 0, '2024-01-01 09:00:00', '2024-01-01 09:00:00'),
+  (1, 'thursday', 0, 0, '2024-01-01 09:00:00', '2024-01-01 09:00:00'),
+  (1, 'friday', 0, 0, '2024-01-01 09:00:00', '2024-01-01 09:00:00'),
+  (1, 'saturday', 0, 0, '2024-01-01 09:00:00', '2024-01-01 09:00:00'),
+  (1, 'sunday', 0, 0, '2024-01-01 09:00:00', '2024-01-01 09:00:00'),
+  (2, 'monday', 2, 1, '2024-01-01 09:00:00', '2024-01-01 09:00:00'),
+  (2, 'tuesday', 2, 1, '2024-01-01 09:00:00', '2024-01-01 09:00:00'),
+  (2, 'wednesday', 2, 1, '2024-01-01 09:00:00', '2024-01-01 09:00:00'),
+  (2, 'thursday', 2, 1, '2024-01-01 09:00:00', '2024-01-01 09:00:00'),
+  (2, 'friday', 1, 0, '2024-01-01 09:00:00', '2024-01-01 09:00:00'),
+  (2, 'saturday', 0, 0, '2024-01-01 09:00:00', '2024-01-01 09:00:00'),
+  (2, 'sunday', 0, 0, '2024-01-01 09:00:00', '2024-01-01 09:00:00'),
+  (3, 'monday', 1, 1, '2024-01-01 09:00:00', '2024-01-01 09:00:00'),
+  (3, 'tuesday', 1, 1, '2024-01-01 09:00:00', '2024-01-01 09:00:00'),
+  (3, 'wednesday', 1, 1, '2024-01-01 09:00:00', '2024-01-01 09:00:00'),
+  (3, 'thursday', 1, 1, '2024-01-01 09:00:00', '2024-01-01 09:00:00'),
+  (3, 'friday', 1, 0, '2024-01-01 09:00:00', '2024-01-01 09:00:00'),
+  (3, 'saturday', 0, 0, '2024-01-01 09:00:00', '2024-01-01 09:00:00'),
+  (3, 'sunday', 0, 0, '2024-01-01 09:00:00', '2024-01-01 09:00:00');
+
 -- Application catalog and records
 CREATE TABLE `application_types` (
   `id` INT NOT NULL,
@@ -249,12 +319,29 @@ CREATE TABLE `application_types` (
   `description_en` VARCHAR(255) NOT NULL,
   `icon` VARCHAR(50) NOT NULL,
   `color` VARCHAR(30) NOT NULL,
+  `uses_vacation_calculator` TINYINT(1) NOT NULL DEFAULT 0,
+  `uses_grace_period_tracker` TINYINT(1) NOT NULL DEFAULT 0,
+  `uses_penalty_tracker` TINYINT(1) NOT NULL DEFAULT 0,
+  `uses_extra_bonus_tracker` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO `application_types` (`id`, `name_ka`, `name_en`, `description_ka`, `description_en`, `icon`, `color`) VALUES
-  (1, 'ßâ¿ßâòßâößâæßâúßâÜßâößâæßâÿßâí ßâÆßâÉßâ£ßâÉßâ¬ßâ«ßâÉßâôßâÿ', 'Leave request', 'ßâôßâÉßâÆßâößâÆßâ¢ßâÿßâÜßâÿ ßâÉßâ£ ßâúßâ¬ßâÉßâæßâößâôßâÿ ßâ¿ßâòßâößâæßâúßâÜßâößâæßâößâæßâÿßâí ßâôßâÉßâ¢ßâóßâÖßâÿßâ¬ßâößâæßâÿßâí ßâíßâÉßâ¢ßâúßâ¿ßâÉßâ¥ ßâ₧ßâáα┤òα╡ìα┤░ßâößâíßâÿ.', 'Approval workflow for planned or urgent leave requests.', 'CalendarDays', 'bg-sky-500'),
-  (2, 'ßâÖßâ¥ßâ¢ßâÉßâ£ßâôßâÿßâáßâößâæßâÿßâí ßâÆßâÉßâ£ßâÉßâ¬ßâ«ßâÉßâôßâÿ', 'Business trip request', 'ßâÖßâ¥ßâ¢ßâÉßâ£ßâôßâÿßâáßâößâæßâÉßâíßâùßâÉßâ£ ßâôßâÉßâÖßâÉßâòßâ¿ßâÿßâáßâößâæßâúßâÜßâÿ ßâ«ßâÉßâáßâ»ßâößâæßâÿßâíßâÉ ßâôßâÉ ßâôßâÉßâÆßâößâÆßâ¢ßâòßâÿßâí ßâôßâÉßâ¢ßâóßâÖßâÿßâ¬ßâößâæßâÉ.', 'Approval for travel itineraries and budget expectations.', 'Plane', 'bg-indigo-500');
+INSERT INTO `application_types` (
+  `id`,
+  `name_ka`,
+  `name_en`,
+  `description_ka`,
+  `description_en`,
+  `icon`,
+  `color`,
+  `uses_vacation_calculator`,
+  `uses_grace_period_tracker`,
+  `uses_penalty_tracker`,
+  `uses_extra_bonus_tracker`
+) VALUES
+  (1, '?????????? ?????????', 'Leave request', '????????? ?? ??????? ???????????? ??????????? ??????? ????????.', 'Approval workflow for planned or urgent leave requests.', 'CalendarDays', 'bg-sky-500', 1, 0, 0, 0),
+  (2, '???????????? ????????', 'Business trip request', '??????????????? ????????????? ????????? ?? ????????? ??????????.', 'Approval for travel itineraries and budget expectations.', 'Plane', 'bg-indigo-500', 0, 0, 0, 0),
+  (3, '??????????? ????????', 'Extra hours bonus', '????????? ?????????? ??????????? ??????? ???????? ?????? ????????.', 'Request overtime bonus payout for approved extra hours.', 'TimerReset', 'bg-emerald-500', 0, 0, 0, 1);
 
 CREATE TABLE `application_type_fields` (
   `id` INT NOT NULL AUTO_INCREMENT,
@@ -286,7 +373,13 @@ VALUES
   (2, 'destination', 'ßâôßâÉßâ£ßâÿßâ¿ßâ£ßâúßâÜßâößâæßâÿßâí ßâÉßâôßâÆßâÿßâÜßâÿ', 'Destination', 'text', 1, 'ßâ¢ßâÉßâÆ. ßâæßâÉßâáßâíßâößâÜßâ¥ßâ£ßâÉ, ßâößâíßâ₧ßâÉßâ£ßâößâùßâÿ', 'e.g. Barcelona, Spain', NULL, NULL),
   (2, 'travel_dates', 'ßâÆßâûßâÿßâí ßâùßâÉßâáßâÿßâªßâößâæßâÿ', 'Travel dates', 'date_range', 1, NULL, NULL, 'ßâ¢ßâÿßâúßâùßâÿßâùßâößâù ßâÆßâÉßâ¢ßâÆßâûßâÉßâòßâáßâößâæßâÿßâí ßâôßâÉ ßâôßâÉßâæßâáßâúßâ£ßâößâæßâÿßâí ßâôßâªßâößâößâæßâÿ.', 'Include departure and return dates.'),
   (2, 'budget', 'ßâôßâÉßâÆßâößâÆßâ¢ßâÿßâÜßâÿ ßâæßâÿßâúßâ»ßâößâóßâÿ', 'Estimated budget', 'number', 1, 'ßâ¢ßâÉßâÆ: 2400', 'e.g. 2400', NULL, NULL),
-  (2, 'purpose', 'ßâÖßâ¥ßâ¢ßâÉßâ£ßâôßâÿßâáßâößâæßâÿßâí ßâ¢ßâÿßâûßâÉßâ£ßâÿ', 'Purpose', 'textarea', 1, NULL, NULL, NULL, NULL);
+  (2, 'purpose', 'ßâÖßâ¥ßâ¢ßâÉßâ£ßâôßâÿßâáßâößâæßâÿßâí ßâ¢ßâÿßâûßâÉßâ£ßâÿ', 'Purpose', 'textarea', 1, NULL, NULL, NULL, NULL),
+  (3, 'reason', '????????????? ??????', 'Extra hours reason', 'textarea', 1, NULL, NULL, '??????????? ????? ???? ?????? ?????????? ???????.', 'Explain why the overtime is needed.'),
+  (3, 'start_date', '???????? ??????', 'Work date', 'date', 1, NULL, NULL, NULL, NULL),
+  (3, 'end_date', '?????????? ??????', 'End date', 'date', 1, NULL, NULL, NULL, NULL),
+  (3, 'start_time', '???????? ???', 'Start time', 'time', 1, NULL, NULL, '???????? ?????? ????????????? ????? ?????????.', 'Provide only the overtime window.'),
+  (3, 'end_time', '?????????? ???', 'End time', 'time', 1, NULL, NULL, NULL, NULL),
+  (3, 'additional_comment', '?????????? ?????????', 'Additional comment', 'textarea', 0, NULL, NULL, NULL, NULL);
 
 CREATE TABLE `application_type_flow` (
   `type_id` INT NOT NULL,
@@ -306,7 +399,9 @@ INSERT INTO `application_type_flow` (`type_id`, `step_index`, `role_id`) VALUES
   (1, 0, 1),
   (1, 1, 2),
   (2, 0, 2),
-  (2, 1, 1);
+  (2, 1, 1),
+  (3, 0, 2),
+  (3, 1, 1);
 
 CREATE TABLE `application_type_sla` (
   `type_id` INT NOT NULL,
@@ -323,7 +418,9 @@ INSERT INTO `application_type_sla` (`type_id`, `step_index`, `seconds`, `expire_
   (1, 0, 48 * 3600, 'AUTO_APPROVE'),
   (1, 1, 72 * 3600, 'BOUNCE_BACK'),
   (2, 0, 36 * 3600, 'BOUNCE_BACK'),
-  (2, 1, 48 * 3600, 'AUTO_APPROVE');
+  (2, 1, 48 * 3600, 'AUTO_APPROVE'),
+  (3, 0, 24 * 3600, 'AUTO_APPROVE'),
+  (3, 1, 48 * 3600, 'AUTO_APPROVE');
 
 CREATE TABLE `applications` (
   `id` INT NOT NULL AUTO_INCREMENT,
@@ -364,6 +461,26 @@ CREATE TABLE `application_field_values` (
     FOREIGN KEY (`application_id`) REFERENCES `applications` (`id`)
     ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `application_extra_bonuses` (
+  `application_id` INT NOT NULL,
+  `user_id` INT NOT NULL,
+  `work_date` DATE NOT NULL,
+  `time_minutes` INT NOT NULL DEFAULT 0,
+  `hourly_rate` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `bonus_percent` DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+  `bonus_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`application_id`),
+  KEY `application_extra_bonuses_user_idx` (`user_id`),
+  CONSTRAINT `application_extra_bonuses_application_fk`
+    FOREIGN KEY (`application_id`) REFERENCES `applications` (`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `application_extra_bonuses_user_fk`
+    FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 INSERT INTO `application_field_values` (`application_id`, `field_key`, `value`) VALUES
   (1, 'reason', 'ßâíßâ¼ßâÉßâòßâÜßâößâæßâÿßâí ßâÖßâúßâáßâíßâûßâö ßâôßâÉßâíßâ¼ßâáßâößâæßâÉ'),

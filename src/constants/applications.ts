@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Application-specific constants including status metadata,
  * translations, and field definitions
  */
@@ -43,7 +43,7 @@ export const STATUS_META: Record<
     icon: React.createElement(Clock3, { className: 'w-4 h-4' })
   },
   APPROVED: {
-    label: { ka: 'დამტკიცებულია', en: 'Approved' },
+    label: { ka: 'დადასტურებულია', en: 'Approved' },
     color: 'bg-emerald-100 text-emerald-700',
     icon: React.createElement(CheckCircle2, { className: 'w-4 h-4' })
   },
@@ -119,7 +119,7 @@ export const APPLICATIONS_COPY: Record<
 > = {
   ka: {
     title: 'განაცხადები',
-    subtitle: 'დააკვირდით დამტკიცების პროცესს, გააზიარეთ კომენტარები და მართეთ ავტომატური შეტყობინებები.',
+    subtitle: 'დააკვირდით დადასტურების პროცესს, გააზიარეთ კომენტარები და მართეთ ავტომატური შეტყობინებები.',
     create: '+ ახალი განაცხადი',
     tabs: { all: 'ყველა', pending: 'მოლოდინში', sent: 'ჩემი გაგზავნილები', returned: 'უკან დაბრუნებული' },
     table: {
@@ -139,7 +139,7 @@ export const APPLICATIONS_COPY: Record<
       comment: 'კომენტარი',
       attachments: 'დანართები',
       history: 'ქმედებები',
-      approve: 'დამტკიცება',
+      approve: 'დადასტურება',
       reject: 'დაბრუნება',
       resend: 'რედაქტირება და ხელახლა გაგზავნა',
       close: 'დახურვა',

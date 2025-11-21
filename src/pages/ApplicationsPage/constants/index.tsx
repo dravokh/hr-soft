@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import {
   AlertCircle,
   CheckCircle2,
@@ -109,7 +109,7 @@ export const STATUS_META: Record<
     icon: <Clock3 className="w-4 h-4" />
   },
   APPROVED: {
-    label: { ka: 'დამტკიცებულია', en: 'Approved' },
+    label: { ka: 'დადასტუებულია', en: 'Approved' },
     color: 'bg-emerald-100 text-emerald-700',
     icon: <CheckCircle2 className="w-4 h-4" />
   },
@@ -189,6 +189,26 @@ export const COPY: Record<
       uploadError: string;
       validation: string;
       success: string;
+      usageTitle: string;
+      usageAfterNote: string;
+      usageVacation: string;
+      usageGrace: string;
+      usagePenalty: string;
+      usageAvailable: string;
+      usageUsed: string;
+      usageRemaining: string;
+      usageAfter: string;
+      extraTitle: string;
+      extraDescription: string;
+      extraHours: string;
+      extraPayout: string;
+      extraRate: string;
+      extraMultiplier: string;
+      extraMissing: string;
+      extraValidation: string;
+      usageExceeded: string;
+      usagePenaltyRate: string;
+      nonWorkingDayError: string;
     };
   }
 > = {
@@ -231,7 +251,7 @@ export const COPY: Record<
       showHistory: 'ქმედებების ნახვა',
       hideHistory: 'ქმედებების დამალვა',
       historyPrompt: 'დააჭირეთ ღილაკს, თუ აქტივობის ნახვა გსურთ.',
-      approve: 'დამტკიცება',
+      approve: 'დადასტურება',
       reject: 'დაბრუნება',
       resend: 'რედაქტირება და ხელახლა გაგზავნა',
       close: 'დახურვა',
@@ -259,7 +279,27 @@ export const COPY: Record<
       fileTooLarge: 'ფაილი ძალიან დიდია. მაქსიმალური ზომა {size}MB-ია.',
       uploadError: 'ფაილის ატვირთვა ვერ მოხერხდა. სცადეთ თავიდან.',
       validation: 'გთხოვთ შეავსოთ ყველა სავალდებულო ველი.',
-      success: 'განაცხადი წარმატებით გაიგზავნა.'
+      success: 'განაცხადი წარმატებით გაიგზავნა.',
+      usageTitle: 'Balance overview',
+      usageAfterNote: 'Calculated preview',
+      usageVacation: 'Vacation days',
+      usageGrace: 'Grace hours',
+      usagePenalty: 'Penalty tracker',
+      usageAvailable: 'Total',
+      usageUsed: 'Used',
+      usageRemaining: 'Remaining',
+      usageAfter: 'After request',
+      extraTitle: 'Overtime bonus',
+      extraDescription: 'Estimated payout once this request is approved.',
+      extraHours: 'Extra hours',
+      extraPayout: 'Projected payout',
+      extraRate: 'Base hourly rate',
+      extraMultiplier: 'Includes {percent} bonus per hour',
+      extraMissing: 'Select dates and times to preview the bonus.',
+      extraValidation: 'დარწმუნდით, რომ დამატებითი საათები ემთხვევა თქვენს სამუშაო ცვლას და არ ემთხვევა დასვენების დღეს.',
+      usageExceeded: 'Over limit by {value}',
+      usagePenaltyRate: 'Penalty rate: {value}',
+      nonWorkingDayError: 'არჩეული თარიღი დასვენების დღეა. აირჩიეთ სამუშაო დღე.'
     }
   },
   en: {
@@ -329,7 +369,29 @@ export const COPY: Record<
       fileTooLarge: 'File is too large. Maximum size is {size}MB.',
       uploadError: 'Unable to upload the file. Please try again.',
       validation: 'Please complete every required field.',
-      success: 'Application submitted successfully.'
+      success: 'Application submitted successfully.',
+      usageTitle: 'Balance overview',
+      usageAfterNote: 'Calculated preview',
+      usageVacation: 'Vacation days',
+      usageGrace: 'Grace hours',
+      usagePenalty: 'Penalty tracker',
+      usageAvailable: 'Total',
+      usageUsed: 'Used',
+      usageRemaining: 'Remaining',
+      usageAfter: 'After request',
+      extraTitle: 'Overtime bonus',
+      extraDescription: 'Estimated payout once this request is approved.',
+      extraHours: 'Extra hours',
+      extraPayout: 'Projected payout',
+      extraRate: 'Base hourly rate',
+      extraMultiplier: 'Includes {percent} bonus per hour',
+      extraMissing: 'Select dates and times to preview the bonus.',
+      extraValidation: 'Overtime requests must match a scheduled working day and shift.',
+      usageExceeded: 'Over limit by {value}',
+      usagePenaltyRate: 'Penalty rate: {value}',
+      nonWorkingDayError: 'Selected date is configured as a day off. Please pick a working day.'
     }
   }
 };
+
+

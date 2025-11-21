@@ -28,6 +28,7 @@ import { COPY } from './ApplicationsPage/constants';
 
 // Import utilities
 import { readFileAsDataUrl, splitRange } from './ApplicationsPage/utils';
+import { validateExtraBonusInput } from '../utils/extraBonus';
 
 const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
   // Context
@@ -113,6 +114,7 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
     currentUser,
     typeById
   });
+
 
   const creatorOptions = useMemo(() => {
     const seen = new Set<number>();
@@ -355,6 +357,15 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
       return;
     }
 
+    if (selectedType.capabilities.usesExtraBonusTracker) {
+      const extraValidation = validateExtraBonusInput(selectedType, currentUser ?? undefined, createValues);
+      if (extraValidation) {
+        setCreateError(t.createModal.extraValidation);
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
     const submissionComment = createComment.trim() ? createComment.trim() : undefined;
 
     try {
@@ -535,14 +546,18 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
   };
 
   // Render
+  const filterHelperCopy =
+    language === 'ka'
+      ? 'ფილტრები დაგეხმარებთ განაცხადების სწრაფად პოვნაში. აირჩიეთ ავტორი, სტატუსი ან თარიღები და დააჭირეთ „ძიებას“.'
+      : 'Use the filters to quickly locate requests. Pick requester, status, or a date range, then hit search.';
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-sky-50/50 py-8">
-      <div className="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-slate-100 py-10">
+      <div className="mx-auto max-w-7xl space-y-8 px-4 sm:px-6 lg:px-10">
+        <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">{t.title}</h1>
-            <p className="mt-1 text-sm leading-relaxed text-slate-600">{t.subtitle}</p>
+            <h1 className="text-3xl font-bold text-slate-900">{t.title}</h1>
+            <p className="mt-1 text-sm text-slate-500">{t.subtitle}</p>
           </div>
           {canCreate && (
             <button
@@ -550,53 +565,57 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
                 resetCreateState();
                 setCreateOpen(true);
               }}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 via-sky-600 to-blue-700 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-200 transition hover:from-sky-600 hover:via-sky-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:ring-offset-2"
+              className="inline-flex items-center gap-2 rounded-2xl bg-sky-500 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-300"
             >
               <PlusCircle className="h-4 w-4" />
               {t.create}
             </button>
           )}
-        </div>
+        </header>
 
-        {/* Main Content */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-4 space-y-4">
-            {/* Tabs */}
-            <ApplicationTabs
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              counts={{
-                all: accessibleApplications.length,
-                pending: pendingApplications.length,
-                sent: sentApplications.length,
-                returned: returnedApplications.length
-              }}
-              language={language}
-            />
-
-            {/* Filters */}
-            <ApplicationFiltersComponent
-              filterDraft={filterDraft}
-              onFilterDraftChange={setFilterDraft}
-              onSubmit={handleFiltersSubmit}
-              onClear={handleClearFilters}
-              onLastThirtyDays={handleLastThirtyDays}
-              creatorOptions={creatorOptions}
-              language={language}
-            />
-          </div>
-
-          {/* Table */}
-          <ApplicationsTable
-            applications={filteredApplications}
-            onViewDetails={openDetails}
-            typeById={typeById}
-            userById={userById}
-            language={language}
-          />
+        <div className="grid gap-6 lg:grid-cols-[300px,minmax(0,1fr)]">
+          <aside className="space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <ApplicationFiltersComponent
+                filterDraft={filterDraft}
+                onFilterDraftChange={setFilterDraft}
+                onSubmit={handleFiltersSubmit}
+                onClear={handleClearFilters}
+                onLastThirtyDays={handleLastThirtyDays}
+                creatorOptions={creatorOptions}
+                language={language}
+              />
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              {filterHelperCopy}
+            </div>
+          </aside>
+          <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-100 px-4 py-3 sm:px-6">
+              <ApplicationTabs
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                counts={{
+                  all: accessibleApplications.length,
+                  pending: pendingApplications.length,
+                  sent: sentApplications.length,
+                  returned: returnedApplications.length
+                }}
+                language={language}
+              />
+            </div>
+            <div className="px-2 py-4 sm:px-6">
+              <ApplicationsTable
+                applications={filteredApplications}
+                onViewDetails={openDetails}
+                typeById={typeById}
+                userById={userById}
+                language={language}
+              />
+            </div>
+          </section>
         </div>
       </div>
-
       {/* Modals */}
       <CreateApplicationModal
         isOpen={createOpen}
@@ -623,6 +642,7 @@ const ApplicationsPage: React.FC<ApplicationsPageProps> = ({ language }) => {
         success={createSuccess}
         onSuccessChange={setCreateSuccess}
         language={language}
+        requester={currentUser}
       />
 
       {selected && (

@@ -17,6 +17,14 @@ export interface ApplicationTypesCopy {
     hasCommentField: string;
     allowsAttachments: string;
   };
+  usage: {
+    title: string;
+    description: string;
+    vacation: string;
+    grace: string;
+    penalty: string;
+    extra: string;
+  };
   requiredLabel: string;
   allowedRoles: string;
   flowTitle: string;
@@ -35,60 +43,70 @@ export interface ApplicationTypesCopy {
 }
 
 export const DEFAULT_REASON_PLACEHOLDER = {
-  ka: 'მოკლედ აღწერეთ განაცხადის მიზეზი…',
+  ka: 'მოკლედ აღწერეთ განაცხადის მიზანი…',
   en: 'Describe why you are submitting this request…'
 };
 
 export const DEFAULT_COMMENT_PLACEHOLDER = {
-  ka: 'შეიტანეთ დამატებითი ინფორმაცია საჭიროების შემთხვევაში…',
-  en: 'Add context for reviewers if needed…'
+  ka: 'დაამატეთ დამატებითი განმარტება საჭიროების შემთხვევაში…',
+  en: 'Add extra context for reviewers if needed…'
 };
 
 export const COPY: Record<'ka' | 'en', ApplicationTypesCopy> = {
   ka: {
     title: 'განაცხადების ტიპები',
-    subtitle: 'მართეთ დამტკიცების ნაკადები, სტანდარტული ველები და SLA წესები თითოეული განაცხადისთვის.',
-    create: 'ახალი ტიპის შექმნა',
+    subtitle:
+      'დააგეგმე დამტკიცებების ჯაჭვები, სტანდარტული ველები და SLA წესები, რათა გუნდის განაცხადები ერთიანი პროცედურით დამუშავდეს.',
+    create: 'ახალი ტიპი',
     edit: 'ტიპის რედაქტირება',
-    view: 'ტიპის დეტალები',
-    empty: 'ჯერ არცერთი განაცხადის ტიპი არ არის შექმნილი.',
+    view: 'ტიპის ნახვა',
+    empty: 'ჯერ არცერთი განაცხადის ტიპი არ გაქვთ შექმნილი.',
     basicInformation: 'ძირითადი ინფორმაცია',
     nameKa: 'დასახელება',
     descriptionKa: 'აღწერა',
     fieldSettings: 'ველების კონფიგურაცია',
     toggles: {
-      requiresDateRange: 'კალენდრის დიაპაზონი',
+      requiresDateRange: 'თარიღების დიაპაზონი',
       requiresTimeRange: 'დროის დიაპაზონი',
-      hasCommentField: 'დამატებითი კომენტარი',
-      allowsAttachments: 'ფაილის ატვირთვა (50მბ-მდე)'
+      hasCommentField: 'კომენტარის ველი',
+      allowsAttachments: 'ფაილების ატვირთვა (მდე 50MB)'
+    },
+    usage: {
+      title: 'სალაროს/ბალანსის კალკულატორები',
+      description: 'აირჩიე რომელი ბალანსები უნდა გამოაკლდეს ამ ტიპის განაცხადის გაგზავნისას.',
+      vacation: 'შვებულების კალკულატორი',
+      grace: 'დაგვიანების საათების კონტროლი',
+      penalty: 'დამატებითი საათების ჯარიმა',
+      extra: 'Extra bonus calculator'
     },
     requiredLabel: 'სავალდებულო',
-    allowedRoles: 'ვინ შეუძლია განაცხადის შექმნა',
-    flowTitle: 'დამტკიცების მიმდევრობა',
+    allowedRoles: 'ვის შეუძლია ამ განაცხადის შევსება',
+    flowTitle: 'დამტკიცების ჯაჭვი',
     addStep: 'ნაბიჯის დამატება',
-    slaTitle: 'SLA თითო ნაბიჯზე',
+    slaTitle: 'SLA თითოეულ ნაბიჯზე',
     hours: 'საათი',
-    expiryAction: 'ვადის ამოწურვისას',
+    expiryAction: 'ვადაგადაცილებისას',
     actions: {
-      save: 'შენახვა',
+      save: 'ცვლილებების შენახვა',
       saving: 'ინახება…',
       cancel: 'გაუქმება',
       delete: 'ტიპის წაშლა'
     },
     successCreated: 'ტიპი წარმატებით შეიქმნა.',
-    successUpdated: 'ცვლილებები შენახულია.',
-    successDeleted: 'ტიპი წაიშალა.',
+    successUpdated: 'ცვლილებები წარმატებით შეინახა.',
+    successDeleted: 'ტიპი წარმატებით წაიშალა.',
     noPermission: 'თქვენ არ გაქვთ განაცხადების ტიპების მართვის უფლება.',
-    validationError: 'გთხოვთ შეავსოთ სავალდებულო ველები და მიუთითოთ მინიმუმ ერთი ნაბიჯი.',
-    selectRole: 'აირჩიეთ როლი…',
+    validationError: 'შეავსეთ სავალდებულო ველები და მიუთითეთ მინიმუმ ერთი დამტკიცების ეტაპი.',
+    selectRole: 'არჩევა…',
     expireActions: {
-      AUTO_APPROVE: 'ავტომატური დამტკიცება',
-      BOUNCE_BACK: 'დაბრუნება ავტორზე'
+      AUTO_APPROVE: 'ავტომატური დადასტურება',
+      BOUNCE_BACK: 'დაბრუნება ინიციატორთან'
     }
   },
   en: {
     title: 'Application types',
-    subtitle: 'Configure approval flows, standard fields, and SLA rules for each request.',
+    subtitle:
+      'Set up standard fields, approval flows, and SLA rules so every request follows the same playbook.',
     create: 'Create type',
     edit: 'Edit type',
     view: 'Type overview',
@@ -101,7 +119,15 @@ export const COPY: Record<'ka' | 'en', ApplicationTypesCopy> = {
       requiresDateRange: 'Calendar range',
       requiresTimeRange: 'Time range',
       hasCommentField: 'Comment box',
-      allowsAttachments: 'Upload file from computer (up to 50MB)'
+      allowsAttachments: 'Upload files (up to 50MB)'
+    },
+    usage: {
+      title: 'Usage tracking',
+      description: 'Pick which employee balances this request type should decrement on submission.',
+      vacation: 'Vacation day calculator',
+      grace: 'Grace period tracker',
+      penalty: 'Overtime penalty tracker',
+      extra: 'Extra bonus (overtime)'
     },
     requiredLabel: 'Required',
     allowedRoles: 'Who can submit this request',
@@ -120,7 +146,7 @@ export const COPY: Record<'ka' | 'en', ApplicationTypesCopy> = {
     successUpdated: 'Changes saved successfully.',
     successDeleted: 'Type removed successfully.',
     noPermission: 'You do not have permission to manage request types.',
-    validationError: 'Please fill in required fields and configure at least one approval step.',
+    validationError: 'Please fill required fields and configure at least one approval step.',
     selectRole: 'Select role…',
     expireActions: {
       AUTO_APPROVE: 'Auto approve',

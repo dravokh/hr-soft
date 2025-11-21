@@ -9,12 +9,6 @@ export const ensureAdminPermissions = (roles: Role[]): Role[] => {
       permissions = ALL_PERMISSIONS.map((permission) => permission.id);
     }
 
-    if (role.id === 2) {
-      const enriched = new Set(permissions);
-      enriched.add('manage_request_types');
-      permissions = Array.from(enriched);
-    }
-
     return {
       ...role,
       permissions: Array.from(new Set(permissions))

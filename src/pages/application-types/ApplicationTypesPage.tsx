@@ -6,6 +6,7 @@ import {
   buildDefaultFormState,
   buildFields,
   buildFormStateFromType,
+  coerceUsageCapabilities,
   syncSlaWithFlow,
   validateForm
 } from './helpers';
@@ -237,13 +238,13 @@ export const ApplicationTypesPage: React.FC<ApplicationTypesPageProps> = ({ lang
     const descriptionKa = formState.descriptionKa.trim();
     const fallbackIcon = existing?.icon ?? 'FileText';
     const fallbackColor = existing?.color ?? 'bg-slate-500';
-    const capabilitySnapshot: ApplicationType['capabilities'] = {
+    const capabilitySnapshot: ApplicationType['capabilities'] = coerceUsageCapabilities({
       ...formState.capabilities,
       attachmentMaxSizeMb: Math.max(
         1,
         formState.capabilities.attachmentMaxSizeMb || existing?.capabilities.attachmentMaxSizeMb || 50
       )
-    };
+    });
 
     return {
       name: {

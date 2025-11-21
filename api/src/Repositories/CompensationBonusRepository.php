@@ -15,7 +15,7 @@ final class CompensationBonusRepository
     public function tree(): array
     {
         $statement = $this->connection->query(
-            'SELECT id, parent_id, name, percent
+            'SELECT id, parent_id, name, percent, amount
              FROM compensation_bonuses
              ORDER BY parent_id IS NULL DESC, parent_id, id'
         );
@@ -32,6 +32,7 @@ final class CompensationBonusRepository
                 'parentId' => $row['parent_id'] !== null ? (int) $row['parent_id'] : null,
                 'name' => (string) $row['name'],
                 'percent' => $row['percent'] !== null ? (float) $row['percent'] : null,
+                'amount' => $row['amount'] !== null ? (float) $row['amount'] : null,
                 'children' => []
             ];
         }
@@ -110,33 +111,42 @@ final class CompensationBonusRepository
 
         $percentValue = $node['percent'] ?? null;
         $percent = $percentValue === '' || $percentValue === null ? null : (float) $percentValue;
+        $amountValue = $node['amount'] ?? null;
+        $amount = $amountValue === '' || $amountValue === null ? null : (float) $amountValue;
+
+        if ($percent !== null && $amount !== null) {
+            throw new \InvalidArgumentException('Bonus cannot define both percent and amount.');
+        }
 
         $id = isset($node['id']) && (int) $node['id'] > 0 ? (int) $node['id'] : null;
 
         if ($id !== null) {
             $statement = $this->connection->prepare(
-                'INSERT INTO compensation_bonuses (id, parent_id, name, percent)
-                 VALUES (:id, :parent_id, :name, :percent)
+                'INSERT INTO compensation_bonuses (id, parent_id, name, percent, amount)
+                 VALUES (:id, :parent_id, :name, :percent, :amount)
                  ON DUPLICATE KEY UPDATE
                     parent_id = VALUES(parent_id),
                     name = VALUES(name),
-                    percent = VALUES(percent)'
+                    percent = VALUES(percent),
+                    amount = VALUES(amount)'
             );
             $statement->execute([
                 ':id' => $id,
                 ':parent_id' => $parentId,
                 ':name' => $name,
-                ':percent' => $percent
+                ':percent' => $percent,
+                ':amount' => $amount
             ]);
         } else {
             $statement = $this->connection->prepare(
-                'INSERT INTO compensation_bonuses (parent_id, name, percent)
-                 VALUES (:parent_id, :name, :percent)'
+                'INSERT INTO compensation_bonuses (parent_id, name, percent, amount)
+                 VALUES (:parent_id, :name, :percent, :amount)'
             );
             $statement->execute([
                 ':parent_id' => $parentId,
                 ':name' => $name,
-                ':percent' => $percent
+                ':percent' => $percent,
+                ':amount' => $amount
             ]);
             $id = (int) $this->connection->lastInsertId();
         }
@@ -163,7 +173,24 @@ final class CompensationBonusRepository
             'parentId' => $node['parentId'],
             'name' => (string) $node['name'],
             'percent' => $node['percent'] !== null ? (float) $node['percent'] : null,
+            'amount' => $node['amount'] !== null ? (float) $node['amount'] : null,
+            'valueType' => $this->determineValueType(
+                $node['percent'] !== null ? (float) $node['percent'] : null,
+                $node['amount'] !== null ? (float) $node['amount'] : null
+            ),
             'children' => array_map($this->formatNode(...), $children)
         ];
+    }
+
+    private function determineValueType(?float $percent, ?float $amount): string
+    {
+        if ($amount !== null) {
+            return 'amount';
+        }
+        if ($percent !== null) {
+            return 'percent';
+        }
+
+        return 'none';
     }
 }

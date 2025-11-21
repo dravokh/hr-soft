@@ -94,12 +94,20 @@ export const normalizeApplicationBundle = (
     applicationId: bundle.application.id
   }));
 
+  const normalizedExtraBonus = bundle.extraBonus
+    ? {
+        ...bundle.extraBonus,
+        applicationId: bundle.application.id
+      }
+    : null;
+
   return {
     ...bundle,
     application: normalizedApplication,
     attachments: normalizedAttachments,
     values: normalizedValues,
-    delegates: bundle.delegates ?? []
+    delegates: bundle.delegates ?? [],
+    extraBonus: normalizedExtraBonus
   };
 };
 

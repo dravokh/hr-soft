@@ -11,6 +11,7 @@ final class InitialDataSeeder extends AbstractSeed
         $this->seedPermissions();
         $this->seedRolePermissions();
         $this->seedUsers();
+        $this->seedTeacherClassHours();
         $this->seedApplicationTypes();
         $this->seedApplicationTypeFields();
         $this->seedApplicationTypeFlow();
@@ -20,6 +21,7 @@ final class InitialDataSeeder extends AbstractSeed
         $this->seedApplicationAttachments();
         $this->seedApplicationAuditLog();
         $this->seedTickets();
+        $this->seedWorkCalendarDays();
     }
 
     private function seedRoles(): void
@@ -53,6 +55,13 @@ final class InitialDataSeeder extends AbstractSeed
             ['id' => 'update_tickets', 'name' => 'Update tickets', 'category' => 'Tickets'],
             ['id' => 'set_ticket_priority', 'name' => 'Set ticket priority', 'category' => 'Tickets'],
             ['id' => 'manage_request_types', 'name' => 'Manage request types', 'category' => 'Requests'],
+            ['id' => 'view_hr', 'name' => 'Access HR workspace', 'category' => 'HR'],
+            ['id' => 'manage_work_shifts', 'name' => 'Manage work shifts', 'category' => 'HR'],
+            ['id' => 'manage_lesson_bonuses', 'name' => 'Manage lesson bonuses', 'category' => 'HR'],
+            ['id' => 'view_teacher_schedule', 'name' => 'View teacher schedule', 'category' => 'Teacher Schedule'],
+            ['id' => 'analyze_teacher_schedule', 'name' => 'Analyze teacher schedule files', 'category' => 'Teacher Schedule'],
+            ['id' => 'assign_teacher_schedule', 'name' => 'Assign teacher schedule records', 'category' => 'Teacher Schedule'],
+            ['id' => 'manage_learning', 'name' => 'Manage learning workspace', 'category' => 'Learning'],
             ['id' => 'manage_permissions', 'name' => 'Manage permissions', 'category' => 'System'],
         ];
 
@@ -75,6 +84,13 @@ final class InitialDataSeeder extends AbstractSeed
             'update_tickets',
             'set_ticket_priority',
             'manage_request_types',
+            'view_hr',
+            'manage_work_shifts',
+            'manage_lesson_bonuses',
+            'view_teacher_schedule',
+            'analyze_teacher_schedule',
+            'assign_teacher_schedule',
+            'manage_learning',
         ];
 
         $employeePermissions = [
@@ -125,6 +141,49 @@ final class InitialDataSeeder extends AbstractSeed
         ];
 
         $this->insertMissing('users', $users, 'id');
+    }
+
+    private function seedTeacherClassHours(): void
+    {
+        $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        $now = date('Y-m-d H:i:s');
+
+        $rows = [];
+
+        foreach ($days as $day) {
+            $rows[] = [
+                'user_id' => 1,
+                'day_of_week' => $day,
+                'cambridge_hours' => 0,
+                'georgian_hours' => 0,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        foreach ($days as $day) {
+            $rows[] = [
+                'user_id' => 2,
+                'day_of_week' => $day,
+                'cambridge_hours' => in_array($day, ['saturday', 'sunday'], true) ? 0 : 2,
+                'georgian_hours' => in_array($day, ['saturday', 'sunday'], true) ? 0 : 1,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        foreach ($days as $day) {
+            $rows[] = [
+                'user_id' => 3,
+                'day_of_week' => $day,
+                'cambridge_hours' => in_array($day, ['saturday', 'sunday'], true) ? 0 : 1,
+                'georgian_hours' => in_array($day, ['saturday', 'sunday'], true) ? 0 : 1,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        $this->insertMissing('teacher_class_hours', $rows, ['user_id', 'day_of_week']);
     }
 
     private function seedApplicationTypes(): void
@@ -486,6 +545,24 @@ final class InitialDataSeeder extends AbstractSeed
         ];
 
         $this->insertMissing('tickets', $tickets, 'id');
+    }
+
+    private function seedWorkCalendarDays(): void
+    {
+        $days = [
+            [
+                'work_date' => '2025-01-01',
+                'is_working' => 0,
+                'note' => 'New Year Holiday',
+            ],
+            [
+                'work_date' => '2025-01-07',
+                'is_working' => 0,
+                'note' => 'Orthodox Christmas',
+            ],
+        ];
+
+        $this->insertMissing('work_calendar_days', $days, 'work_date');
     }
 
     /**
